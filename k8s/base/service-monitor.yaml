@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nexusops-backend-monitor
+  namespace: nexusops
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: nexusops-backend
+  endpoints:
+    - port: http
+      path: /api/v1/actuator/prometheus
+      interval: 30s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - nexusops

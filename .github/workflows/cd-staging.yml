@@ -1,0 +1,91 @@
+name: CD - Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: nexusops
+  EKS_CLUSTER: nexusops-staging
+  K8S_NAMESPACE: nexusops-staging
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull and tag images
+        run: |
+          docker pull ghcr.io/${{ github.repository }}/nexusops-backend:${{ github.sha }}
+          docker tag ghcr.io/${{ github.repository }}/nexusops-backend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-backend:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository }}/nexusops-frontend:${{ github.sha }}
+          docker tag ghcr.io/${{ github.repository }}/nexusops-frontend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-frontend:${{ github.sha }}
+
+      - name: Push images to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-backend:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-frontend:${{ github.sha }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to staging
+        run: |
+          cd k8s/overlays/staging
+          kustomize edit set image backend=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-backend:${{ github.sha }}
+          kustomize edit set image frontend=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}/nexusops-frontend:${{ github.sha }}
+          kubectl apply -k .
+          kubectl rollout status deployment/nexusops-backend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/nexusops-frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+
+      - name: Run integration tests against staging
+        run: |
+          sleep 30
+          kubectl run integration-test --image=ghcr.io/${{ github.repository }}/nexusops-backend:${{ github.sha }} --rm -i --restart=Never -- \
+            ./mvnw test -Dtest=*IntegrationTest -Dspring.profiles.active=staging
+
+      - name: Notify deployment
+        if: always()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Staging deployment ${{ job.status }} for ${{ github.repository }}@${{ github.sha }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Staging Deployment ${{ job.status }}*"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Repo: ${{ github.repository }}\nCommit: ${{ github.sha }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

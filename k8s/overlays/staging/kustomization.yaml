@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nexusops-staging
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: staging
+
+images:
+  - name: ghcr.io/nexusops/nexusops-backend
+    newTag: staging
+  - name: ghcr.io/nexusops/nexusops-frontend
+    newTag: staging
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-backend
+        namespace: nexusops-staging
+      spec:
+        replicas: 2
+        template:
+          spec:
+            containers:
+              - name: backend
+                resources:
+                  requests:
+                    cpu: "500m"
+                    memory: "1Gi"
+                  limits:
+                    cpu: "2000m"
+                    memory: "2Gi"
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-frontend
+        namespace: nexusops-staging
+      spec:
+        replicas: 2
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: nexusops-backend-hpa
+        namespace: nexusops-staging
+      spec:
+        minReplicas: 2
+        maxReplicas: 10
+
+configMapGenerator:
+  - name: nexusops-config
+    behavior: merge
+    literals:
+      - SPRING_PROFILES_ACTIVE=staging
+      - NEXUSOPS_API_BASE_URL=https://staging-api.nexusops.com
+      - NEXUSOPS_CORS_ALLOWED_ORIGINS=https://staging.nexusops.com
+      - LOG_LEVEL_ROOT=INFO
+      - LOG_LEVEL_COM_NEXUSOPS=DEBUG

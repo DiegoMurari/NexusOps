@@ -1,0 +1,45 @@
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 4317
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+  trace_idle_period: 10s
+
+compactor:
+  compaction:
+    block_retention: 1h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tmp/tempo/traces
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+
+overrides:
+  metrics_generator_processors:
+    - service-graphs
+    - span-metrics
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: nexusops-dev
+  storage:
+    path: /tmp/tempo/metrics
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true

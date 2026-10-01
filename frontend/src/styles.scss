@@ -1,0 +1,310 @@
+@use '@angular/material' as mat;
+
+// NexusOps design tokens - NOC / command-center visual identity.
+// Source: approved design proposal (design system section).
+:root {
+  color-scheme: light;
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #F0F2F6;
+  --surface-3: #E6E9F0;
+  --border: #E2E5EC;
+  --border-strong: #CBD1DE;
+  --text: #14171F;
+  --text-muted: #5B6270;
+  --text-faint: #8890A0;
+  --accent: #3B5BFF;
+  --accent-2: #7C4DFF;
+  --accent-soft: #EEF1FF;
+  --success: #16A34A;
+  --success-soft: #E7F6ED;
+  --warning: #D97706;
+  --warning-soft: #FDF1DF;
+  --critical: #DC2626;
+  --critical-soft: #FCE8E8;
+  --info: #0284C7;
+  --info-soft: #E3F3FB;
+  --shadow: 0 1px 2px rgba(20, 23, 31, .06), 0 8px 24px rgba(20, 23, 31, .06);
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0B0E14;
+    --surface: #12161F;
+    --surface-2: #1A2030;
+    --surface-3: #232B3D;
+    --border: #262D3D;
+    --border-strong: #333C52;
+    --text: #E8EAF0;
+    --text-muted: #98A0B3;
+    --text-faint: #6B7286;
+    --accent: #5B7CFF;
+    --accent-2: #9F7AFF;
+    --accent-soft: #1B2440;
+    --success: #22C55E;
+    --success-soft: #12291C;
+    --warning: #F5A524;
+    --warning-soft: #2E2311;
+    --critical: #F87171;
+    --critical-soft: #2E1717;
+    --info: #38BDF8;
+    --info-soft: #0F2733;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0B0E14;
+  --surface: #12161F;
+  --surface-2: #1A2030;
+  --surface-3: #232B3D;
+  --border: #262D3D;
+  --border-strong: #333C52;
+  --text: #E8EAF0;
+  --text-muted: #98A0B3;
+  --text-faint: #6B7286;
+  --accent: #5B7CFF;
+  --accent-2: #9F7AFF;
+  --accent-soft: #1B2440;
+  --success: #22C55E;
+  --success-soft: #12291C;
+  --warning: #F5A524;
+  --warning-soft: #2E2311;
+  --critical: #F87171;
+  --critical-soft: #2E1717;
+  --info: #38BDF8;
+  --info-soft: #0F2733;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
+}
+
+// Angular Material - structural theme once (typography/density), color applied
+// separately per palette below. Re-running all-component-themes for dark mode
+// duplicated every structural style block (the build's "duplicate styles"
+// warning); all-component-colors is the correct mixin for a second palette.
+$nexusops-primary: mat.define-palette(mat.$indigo-palette, 600, 400, 800);
+$nexusops-accent: mat.define-palette(mat.$deep-purple-palette, 400, 200, 600);
+$nexusops-warn: mat.define-palette(mat.$red-palette, 600, 400, 800);
+
+$nexusops-theme: mat.define-light-theme((
+  color: (
+    primary: $nexusops-primary,
+    accent: $nexusops-accent,
+    warn: $nexusops-warn,
+  ),
+  typography: mat.define-typography-config(
+    $font-family: 'IBM Plex Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+  ),
+  density: 0,
+));
+
+@include mat.core();
+@include mat.all-component-themes($nexusops-theme);
+
+@media (prefers-color-scheme: dark) {
+  $nexusops-dark-primary: mat.define-palette(mat.$indigo-palette, 300, 100, 500);
+  $nexusops-dark-accent: mat.define-palette(mat.$deep-purple-palette, 200, 100, 400);
+  $nexusops-dark-warn: mat.define-palette(mat.$red-palette, 300, 100, 500);
+
+  $nexusops-dark-theme: mat.define-dark-theme((
+    color: (
+      primary: $nexusops-dark-primary,
+      accent: $nexusops-dark-accent,
+      warn: $nexusops-dark-warn,
+    ),
+  ));
+
+  @include mat.all-component-colors($nexusops-dark-theme);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: #fff;
+}
+
+code, .mono {
+  font-family: var(--mono);
+}
+
+// ---- Domain tokens: ticket status & priority (reused everywhere) ----
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+
+  &.open { color: var(--info); background: var(--info-soft); }
+  &.progress, &.in_progress { color: var(--accent); background: var(--accent-soft); }
+  &.waiting, &.pending { color: var(--warning); background: var(--warning-soft); }
+  &.hold, &.on_hold { color: var(--text-faint); background: var(--surface-3); }
+  &.resolved { color: var(--success); background: var(--success-soft); }
+  &.closed { color: var(--text-faint); background: var(--surface-2); }
+  &.reopened { color: var(--critical); background: var(--critical-soft); }
+}
+
+.prio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+
+  .bar {
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  &.critical { color: var(--critical); .bar { background: var(--critical); } }
+  &.high { color: var(--warning); .bar { background: var(--warning); } }
+  &.medium { color: var(--info); .bar { background: var(--info); } }
+  &.low { color: var(--text-faint); .bar { background: var(--text-faint); } }
+}
+
+.sla-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+
+  &.crit { color: var(--critical); background: var(--critical-soft); }
+  &.warn { color: var(--warning); background: var(--warning-soft); }
+  &.ok { color: var(--success); background: var(--success-soft); }
+}
+
+// ---- Cards & panels: border does the work, shadow reserved for floating UI ----
+.card, .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 16px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  &.k-info::before { background: var(--info); }
+  &.k-critical::before { background: var(--critical); }
+  &.k-success::before { background: var(--success); }
+  &.k-accent::before { background: var(--accent-2); }
+
+  .num {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .lbl {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .trend {
+    font-size: 11px;
+    margin-top: 8px;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 5px;
+
+    &.up { color: var(--success); background: var(--success-soft); }
+    &.down { color: var(--critical); background: var(--critical-soft); }
+  }
+}
+
+.mat-mdc-card {
+  border-radius: var(--radius-m);
+  box-shadow: none !important;
+  border: 1px solid var(--border);
+  background: var(--surface) !important;
+}
+
+.mat-mdc-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mat-mdc-card-subtitle {
+  color: var(--text-muted);
+}
+
+.mat-mdc-button, .mat-mdc-raised-button, .mat-mdc-outlined-button, .mat-mdc-text-button {
+  border-radius: var(--radius-s);
+  font-weight: 500;
+  text-transform: none;
+  padding: 0 20px;
+  height: 38px;
+}
+
+.mat-mdc-raised-button {
+  box-shadow: none !important;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mat-mdc-tab-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.mat-mdc-tab-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-transform: none;
+}
+
+.mat-mdc-tooltip {
+  font-size: 0.75rem;
+}
+
+.cdk-overlay-container {
+  z-index: 1000;
+}

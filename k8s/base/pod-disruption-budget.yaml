@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nexusops-backend-pdb
+  namespace: nexusops
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nexusops-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nexusops-frontend-pdb
+  namespace: nexusops
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nexusops-frontend

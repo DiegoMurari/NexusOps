@@ -1,0 +1,21 @@
+nexusops:
+  sla:
+    calculation:
+      cache-ttl-seconds: 60
+      use-business-hours: true
+      pause-on-hold: true
+      stop-on-first-response: true
+    breach:
+      warning-thresholds: [80, 90]
+      check-interval-minutes: 1
+    escalation:
+      check-interval-minutes: 1
+      max-retries: 3
+    business-calendar:
+      default-timezone: UTC
+      default-hours:
+        monday: "09:00-17:00"
+        tuesday: "09:00-17:00"
+        wednesday: "09:00-17:00"
+        thursday: "09:00-17:00"
+        friday: "09:00-17:00"

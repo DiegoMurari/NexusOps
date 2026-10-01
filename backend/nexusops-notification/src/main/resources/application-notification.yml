@@ -1,0 +1,21 @@
+nexusops:
+  notification:
+    websocket:
+      enabled: true
+      endpoint: /ws/notifications
+      heartbeat-interval: 30000
+    sse:
+      enabled: true
+      endpoint: /api/v1/notifications/stream
+    email:
+      retry-attempts: 3
+      retry-delay-seconds: 60
+      batch-size: 100
+    in-app:
+      retention-days: 90
+      max-per-user: 1000
+    templates:
+      cache-ttl-seconds: 300
+    preferences:
+      default-channels: [IN_APP, EMAIL]
+      quiet-hours-enabled: true

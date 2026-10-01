@@ -1,0 +1,75 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nexusops-dev
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: dev
+
+images:
+  - name: ghcr.io/nexusops/nexusops-backend
+    newTag: dev
+  - name: ghcr.io/nexusops/nexusops-frontend
+    newTag: dev
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-backend
+        namespace: nexusops-dev
+      spec:
+        replicas: 1
+        template:
+          spec:
+            containers:
+              - name: backend
+                resources:
+                  requests:
+                    cpu: "250m"
+                    memory: "512Mi"
+                  limits:
+                    cpu: "1000m"
+                    memory: "1Gi"
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-frontend
+        namespace: nexusops-dev
+      spec:
+        replicas: 1
+        template:
+          spec:
+            containers:
+              - name: frontend
+                resources:
+                  requests:
+                    cpu: "50m"
+                    memory: "64Mi"
+                  limits:
+                    cpu: "250m"
+                    memory: "256Mi"
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: nexusops-backend-hpa
+        namespace: nexusops-dev
+      spec:
+        minReplicas: 1
+        maxReplicas: 3
+
+configMapGenerator:
+  - name: nexusops-config
+    behavior: merge
+    literals:
+      - SPRING_PROFILES_ACTIVE=dev
+      - NEXUSOPS_API_BASE_URL=http://dev-api.nexusops.com
+      - NEXUSOPS_CORS_ALLOWED_ORIGINS=http://dev.nexusops.com
+      - LOG_LEVEL_ROOT=DEBUG
+      - LOG_LEVEL_COM_NEXUSOPS=DEBUG

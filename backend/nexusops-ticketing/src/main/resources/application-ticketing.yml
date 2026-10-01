@@ -1,0 +1,19 @@
+nexusops:
+  ticketing:
+    attachment:
+      max-size: 50MB
+      allowed-types: ["image/*", "application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+      virus-scan: true
+      thumbnail-enabled: true
+    search:
+      highlight-fragments: 3
+      max-results: 100
+    workflow:
+      enabled: true
+      auto-transition-on-first-response: true
+    sla:
+      auto-calculate: true
+      pause-on-hold: true
+    time-tracking:
+      timer-enabled: true
+      round-to-minutes: 1

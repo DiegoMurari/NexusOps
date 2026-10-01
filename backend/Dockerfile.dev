@@ -1,0 +1,27 @@
+FROM eclipse-temurin:21-jdk-alpine
+
+WORKDIR /workspace
+
+RUN apk add --no-cache maven bash
+
+# Copy all source code
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+COPY nexusops-shared-kernel/ nexusops-shared-kernel/
+COPY nexusops-iam/ nexusops-iam/
+COPY nexusops-platform/ nexusops-platform/
+COPY nexusops-sla/ nexusops-sla/
+COPY nexusops-ticketing/ nexusops-ticketing/
+COPY nexusops-asset/ nexusops-asset/
+COPY nexusops-knowledge/ nexusops-knowledge/
+COPY nexusops-notification/ nexusops-notification/
+COPY nexusops-reporting/ nexusops-reporting/
+COPY nexusops-integration/ nexusops-integration/
+COPY nexusops-bootstrap/ nexusops-bootstrap/
+
+# Build entire project (resolves dependencyManagement correctly)
+RUN ./mvnw install -DskipTests -Dmaven.javadoc.skip=true -B
+
+EXPOSE 8080 5005
+
+CMD ["./mvnw", "spring-boot:run", "-pl", "nexusops-bootstrap", "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"]

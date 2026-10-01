@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nexusops-prod
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: prod
+
+images:
+  - name: ghcr.io/nexusops/nexusops-backend
+    newTag: latest
+  - name: ghcr.io/nexusops/nexusops-frontend
+    newTag: latest
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-backend
+        namespace: nexusops-prod
+      spec:
+        replicas: 3
+        template:
+          spec:
+            containers:
+              - name: backend
+                resources:
+                  requests:
+                    cpu: "1000m"
+                    memory: "2Gi"
+                  limits:
+                    cpu: "4000m"
+                    memory: "4Gi"
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nexusops-frontend
+        namespace: nexusops-prod
+      spec:
+        replicas: 3
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: nexusops-backend-hpa
+        namespace: nexusops-prod
+      spec:
+        minReplicas: 3
+        maxReplicas: 50
+
+configMapGenerator:
+  - name: nexusops-config
+    behavior: merge
+    literals:
+      - SPRING_PROFILES_ACTIVE=prod
+      - NEXUSOPS_API_BASE_URL=https://api.nexusops.com
+      - NEXUSOPS_CORS_ALLOWED_ORIGINS=https://nexusops.com
+      - LOG_LEVEL_ROOT=WARN
+      - LOG_LEVEL_COM_NEXUSOPS=INFO

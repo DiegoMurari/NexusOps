@@ -1,0 +1,32 @@
+nexusops:
+  iam:
+    mfa:
+      issuer: "NexusOps"
+      window: 1
+      code-digits: 6
+      backup-codes-count: 10
+    password:
+      min-length: 12
+      max-length: 128
+      breach-check: true
+      min-age-days: 1
+      max-age-days: 90
+      history-count: 5
+    session:
+      max-concurrent: 5
+      idle-timeout-minutes: 30
+    account-lockout:
+      max-failed-attempts: 5
+      lockout-duration-minutes: 15
+    email-verification:
+      token-expiration-hours: 24
+      require-verification: true
+    default-roles:
+      - END_USER
+    system-roles:
+      - SUPER_ADMIN
+      - ADMIN
+      - MANAGER
+      - TEAM_LEAD
+      - AGENT
+      - END_USER

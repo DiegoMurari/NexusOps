@@ -1,0 +1,18 @@
+nexusops:
+  integration:
+    webhook:
+      timeout-seconds: 30
+      max-retries: 5
+      retry-backoff-seconds: 60
+      batch-size: 100
+    connectors:
+      jira:
+        sync-interval-minutes: 15
+        batch-size: 50
+      slack:
+        event-buffer-size: 1000
+      teams:
+        event-buffer-size: 1000
+    sync:
+      max-concurrent-jobs: 3
+      default-schedule: "0 */15 * * *"

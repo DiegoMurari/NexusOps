@@ -1,0 +1,14 @@
+nexusops:
+  asset:
+    discovery:
+      schedule: "0 2 * * *"
+      timeout-minutes: 60
+      max-concurrent-jobs: 5
+    license:
+      compliance-check-interval-hours: 24
+      warning-threshold-percent: 80
+    lifecycle:
+      default-status: PROCURED
+    import:
+      max-file-size: 10MB
+      allowed-formats: ["csv", "xlsx"]

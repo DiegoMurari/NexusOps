@@ -1,0 +1,17 @@
+nexusops:
+  knowledge:
+    article:
+      versioning-enabled: true
+      max-versions: 50
+      auto-save-interval-seconds: 30
+    search:
+      highlight-fragments: 3
+      max-results: 100
+      index-interval-minutes: 5
+    public-portal:
+      enabled: true
+      seo-enabled: true
+      sitemap-enabled: true
+    workflow:
+      require-approval: true
+      auto-publish-on-approval: false

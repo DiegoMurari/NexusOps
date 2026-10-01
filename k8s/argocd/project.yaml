@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nexusops
+  namespace: argocd
+spec:
+  description: NexusOps Project
+  sourceRepos:
+    - https://github.com/nexusops/nexusops.git
+  destinations:
+    - namespace: nexusops-dev
+      server: https://kubernetes.default.svc
+    - namespace: nexusops-staging
+      server: https://kubernetes.default.svc
+    - namespace: nexusops-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: DaemonSet
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+  roles:
+    - name: developer
+      description: Developer role for dev environment
+      policies:
+        - p, proj:nexusops:developer, applications, get, nexusops/nexusops-dev, allow
+        - p, proj:nexusops:developer, applications, sync, nexusops/nexusops-dev, allow
+    - name: operator
+      description: Operator role for staging environment
+      policies:
+        - p, proj:nexusops:operator, applications, get, nexusops/nexusops-staging, allow
+        - p, proj:nexusops:operator, applications, sync, nexusops/nexusops-staging, allow
+    - name: admin
+      description: Admin role for all environments
+      policies:
+        - p, proj:nexusops:admin, applications, *, nexusops/*, allow

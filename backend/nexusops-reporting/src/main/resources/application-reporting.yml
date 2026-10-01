@@ -1,0 +1,15 @@
+nexusops:
+  reporting:
+    cache:
+      ttl-seconds: 300
+      max-size: 1000
+    export:
+      max-rows: 10000
+      pdf-page-size: A4
+      excel-max-rows: 1048576
+    scheduler:
+      enabled: true
+      pool-size: 5
+    materialized-views:
+      refresh-interval-minutes: 60
+      concurrent-refresh: 2

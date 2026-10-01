@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexusops-backend
+  namespace: nexusops
+  labels:
+    app: nexusops-backend
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexusops-backend
+  template:
+    metadata:
+      labels:
+        app: nexusops-backend
+        component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/api/v1/actuator/prometheus"
+    spec:
+      serviceAccountName: nexusops-backend
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: ghcr.io/nexusops/nexusops-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: db-host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: db-port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: db-name
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: db-user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: db-password
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: redis-host
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: redis-port
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: redis-password
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: jwt-private-key
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: jwt-public-key
+            - name: MAIL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: mail-host
+            - name: MAIL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: mail-port
+            - name: MAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: mail-user
+            - name: MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nexusops-secrets
+                  key: mail-password
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/v1/actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/v1/actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30

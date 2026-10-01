@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexusops-postgres-dev
+    environment:
+      POSTGRES_DB: nexusops_dev
+      POSTGRES_USER: nexusops
+      POSTGRES_PASSWORD: nexusops
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexusops -d nexusops_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexusops-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexusops-redis-dev
+    command: redis-server --appendonly yes --requirepass nexusops
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "nexusops", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexusops-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: nexusops-mailhog-dev
+    ports:
+      - "1026:1025"
+      - "8026:8025"
+    networks:
+      - nexusops-network
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.dev
+    container_name: nexusops-backend-dev
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: nexusops_dev
+      DB_USER: nexusops
+      DB_PASSWORD: nexusops
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: nexusops
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      JWT_PRIVATE_KEY: dev-private-key-for-testing-purposes-only-32chars
+      JWT_PUBLIC_KEY: dev-public-key-for-testing-purposes-only-32chars
+      API_BASE_URL: http://localhost:8080
+      CORS_ALLOWED_ORIGINS: http://localhost:4200
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    volumes:
+      - ../../backend:/workspace
+      - ~/.m2:/root/.m2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    networks:
+      - nexusops-network
+    command: ["./mvnw", "spring-boot:run", "-pl", "nexusops-bootstrap", "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"]
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.dev
+    container_name: nexusops-frontend-dev
+    environment:
+      NODE_ENV: development
+    ports:
+      - "4200:4200"
+    volumes:
+      - ../../frontend:/workspace
+      - /workspace/node_modules
+      - /workspace/dist
+    depends_on:
+      - backend
+    networks:
+      - nexusops-network
+    command: ["pnpm", "run", "start"]
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  nexusops-network:
+    driver: bridge
