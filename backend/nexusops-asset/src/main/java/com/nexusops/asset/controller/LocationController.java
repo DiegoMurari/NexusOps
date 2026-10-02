@@ -40,6 +40,14 @@ public class LocationController {
         return ResponseEntity.ok(locationService.findByTenantId(tenantId));
     }
 
+    @GetMapping("/options")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Active locations (id, name, code) to pick from in a form; no asset permission needed")
+    public ResponseEntity<List<LocationDto.Option>> options() {
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return ResponseEntity.ok(locationService.findOptions(tenantId));
+    }
+
     @GetMapping("/roots")
     @PreAuthorize("hasPermission('ASSET', 'READ')")
     @Operation(summary = "List root locations")
@@ -52,7 +60,8 @@ public class LocationController {
     @PreAuthorize("hasPermission('ASSET', 'READ')")
     @Operation(summary = "List child locations")
     public ResponseEntity<List<LocationDto>> listChildren(@PathVariable String parentId) {
-        return ResponseEntity.ok(locationService.findChildren(parentId));
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return ResponseEntity.ok(locationService.findChildren(parentId, tenantId));
     }
 
     @GetMapping("/{id}")

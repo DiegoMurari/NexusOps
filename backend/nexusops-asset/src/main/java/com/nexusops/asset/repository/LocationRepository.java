@@ -17,4 +17,10 @@ public interface LocationRepository extends JpaRepository<Location, String> {
     List<Location> findByTenantIdAndParentIdIsNull(String tenantId);
 
     List<Location> findByParentId(String parentId);
+
+    List<Location> findByParentIdAndTenantId(String parentId, String tenantId);
+
+    boolean existsByTenantIdAndCodeIgnoreCase(String tenantId, String code);
+
+    boolean existsByTenantIdAndCodeIgnoreCaseAndIdNot(String tenantId, String code, String id);
 }

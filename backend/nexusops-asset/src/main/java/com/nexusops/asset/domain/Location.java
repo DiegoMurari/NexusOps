@@ -26,6 +26,14 @@ public class Location implements TenantAware {
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
+    /** Código estável (ex.: FRANCA), usado por regras de roteamento. Único por tenant, sem diferenciar caixa. */
+    @Column(name = "code", length = 50)
+    private String code;
+
+    @Column(name = "active", nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
     @Column(name = "description", length = 1000)
     private String description;
 

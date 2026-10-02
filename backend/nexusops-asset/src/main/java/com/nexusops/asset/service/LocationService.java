@@ -28,7 +28,14 @@ public class LocationService {
             throw new ValidationException("Parent location not found in tenant: " + request.getParentId());
         }
 
+        String code = normalizedCode(request.getCode());
+        if (code != null && locationRepository.existsByTenantIdAndCodeIgnoreCase(tenantId, code)) {
+            throw new ValidationException("Location code already in use: " + code);
+        }
+
         Location location = locationMapper.toEntity(request);
+        location.setCode(code);
+        location.setActive(request.getActive() == null || request.getActive());
         location.setTenantId(tenantId);
         location.setType(request.getType() != null ? request.getType() : Location.LocationType.SITE);
         location.setCreatedBy(createdBy);
@@ -42,14 +49,23 @@ public class LocationService {
         return locationRepository.findByTenantId(tenantId).stream().map(locationMapper::toDto).toList();
     }
 
+    /** Localidades ativas do tenant, só o necessário para escolher uma (qualquer usuário autenticado). */
+    @Transactional(readOnly = true)
+    public List<LocationDto.Option> findOptions(String tenantId) {
+        return findByTenantId(tenantId).stream()
+            .filter(l -> !Boolean.FALSE.equals(l.getActive()))
+            .map(l -> new LocationDto.Option(l.getId(), l.getName(), l.getCode()))
+            .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<LocationDto> findRoots(String tenantId) {
         return locationRepository.findByTenantIdAndParentIdIsNull(tenantId).stream().map(locationMapper::toDto).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<LocationDto> findChildren(String parentId) {
-        return locationRepository.findByParentId(parentId).stream().map(locationMapper::toDto).toList();
+    public List<LocationDto> findChildren(String parentId, String tenantId) {
+        return locationRepository.findByParentIdAndTenantId(parentId, tenantId).stream().map(locationMapper::toDto).toList();
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +83,14 @@ public class LocationService {
             throw new ValidationException("A location cannot be its own parent");
         }
 
+        String code = normalizedCode(request.getCode());
+        if (code != null && locationRepository.existsByTenantIdAndCodeIgnoreCaseAndIdNot(tenantId, code, id)) {
+            throw new ValidationException("Location code already in use: " + code);
+        }
+
         location.setName(request.getName());
+        location.setCode(code);
+        if (request.getActive() != null) location.setActive(request.getActive());
         location.setDescription(request.getDescription());
         location.setParentId(request.getParentId());
         if (request.getType() != null) location.setType(request.getType());
@@ -77,6 +100,14 @@ public class LocationService {
         location.setUpdatedAt(Instant.now());
 
         return locationMapper.toDto(locationRepository.save(location));
+    }
+
+    /** Código vazio vira nulo; os demais são guardados em maiúsculas, para comparar sem ambiguidade. */
+    private static String normalizedCode(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        return code.trim().toUpperCase();
     }
 
     public void deleteLocation(String id, String tenantId) {
