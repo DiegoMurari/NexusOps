@@ -1,18 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <title>NexusOps - Service Desk & IT Operations Platform</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Icons&display=swap" rel="stylesheet">
-  <meta name="theme-color" content="#3B5BFF">
+  <meta name="theme-color" content="#F5F6F8">
+  <script>
+    // Aplica o tema salvo antes do Angular subir (sem piscar). Sem escolha guardada, o padrão é o claro.
+    try { document.documentElement.setAttribute('data-theme', localStorage.getItem('nexusops.theme') === 'dark' ? 'dark' : 'light'); }
+    catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+  </script>
   <meta name="description" content="NexusOps - Service Desk & IT Operations Platform">
 </head>
 <body>
+  <a class="skip-link" id="skip-link" href="#main-content">Pular para o conteúdo</a>
   <nexusops-root></nexusops-root>
+  <script>
+    // Skip link lives outside the Angular shell: move focus to the main landmark
+    // (falls back to the first form on pages without one, such as login).
+    function findTarget() { return document.querySelector('main, [role="main"], form'); }
+    function tagTarget() {
+      var target = findTarget();
+      if (target && target.id !== 'main-content') {
+        var previous = document.getElementById('main-content');
+        if (previous && previous !== target) { previous.removeAttribute('id'); }
+        target.id = 'main-content';
+        target.setAttribute('tabindex', '-1');
+      }
+    }
+    // The shell renders after bootstrap and route changes swap the DOM, so keep the target tagged.
+    new MutationObserver(tagTarget).observe(document.body, { childList: true, subtree: true });
+    tagTarget();
+    document.getElementById('skip-link').addEventListener('click', function (event) {
+      event.preventDefault();
+      var target = findTarget();
+      if (target) { target.focus(); }
+    });
+  </script>
 </body>
 </html>

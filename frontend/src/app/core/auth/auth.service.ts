@@ -51,6 +51,7 @@ export class AuthService {
   private _isAuthenticated = signal(false);
   private _isMfaRequired = signal(false);
   private _loading = signal(false);
+  private pendingCredentials: { username: string; password: string; rememberMe?: boolean } | null = null;
 
   user = computed(() => this._user());
   isAuthenticated = computed(() => this._isAuthenticated());
@@ -99,7 +100,9 @@ export class AuthService {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, credentials).pipe(
       tap(response => this.handleAuthSuccess(response)),
       catchError(err => {
-        if (err.status === 401 && err.error?.detail?.includes('MFA')) {
+        // O servidor pede o código do autenticador: guarda as credenciais só na memória, para a segunda etapa.
+        if (typeof err.error?.detail === 'string' && err.error.detail.includes('MFA_REQUIRED')) {
+          this.pendingCredentials = { username: credentials.username, password: credentials.password, rememberMe: credentials.rememberMe };
           this._isMfaRequired.set(true);
         }
         return throwError(() => err);
@@ -108,12 +111,23 @@ export class AuthService {
     );
   }
 
+  /** Segunda etapa do login: repete o login com o código de 6 dígitos do autenticador. */
   verifyMfa(code: string): Observable<LoginResponse> {
-    this._loading.set(true);
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/mfa/verify`, { code }).pipe(
-      tap(response => this.handleAuthSuccess(response)),
-      finalize(() => this._loading.set(false))
+    const credentials = this.pendingCredentials;
+    if (!credentials) {
+      return throwError(() => ({ error: { detail: 'Sessão de login expirada. Entre novamente.' } }));
+    }
+    return this.login({ ...credentials, mfaCode: code }).pipe(
+      tap(() => {
+        this.pendingCredentials = null;
+        this._isMfaRequired.set(false);
+      })
     );
+  }
+
+  /** Há um login esperando o código do autenticador. */
+  hasPendingMfa(): boolean {
+    return this.pendingCredentials !== null;
   }
 
   private handleAuthSuccess(response: LoginResponse): void {
@@ -191,12 +205,27 @@ export class AuthService {
     return this._user()?.permissions.includes(permission) ?? false;
   }
 
+  /** Tem a permissão em qualquer escopo? Ex.: can('SLA', 'READ') cobre SLA:READ:TENANT. */
+  can(resource: string, action: string): boolean {
+    const prefix = `${resource}:${action}:`;
+    return this._user()?.permissions.some(p => p.startsWith(prefix)) ?? false;
+  }
+
   hasRole(role: string): boolean {
     return this._user()?.roles.includes(role) ?? false;
   }
 
   hasAnyRole(roles: string[]): boolean {
     return roles.some(r => this.hasRole(r));
+  }
+
+  /** Reflete no usuário guardado (sinal e navegador) que a verificação em duas etapas mudou. */
+  markMfaEnabled(enabled: boolean): void {
+    const user = this._user();
+    if (!user) return;
+    const updated = { ...user, mfaEnabled: enabled };
+    this._user.set(updated);
+    localStorage.setItem(this.USER_KEY, JSON.stringify(updated));
   }
 
   setupMfa(): Observable<MfaSetupResponse> {

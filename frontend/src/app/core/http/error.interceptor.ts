@@ -2,11 +2,9 @@ import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpEvent, HttpErrorResp
 import { inject } from '@angular/core';
 import { Observable, throwError, catchError, switchMap } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
-import { Router } from '@angular/router';
 
 export const errorInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn): Observable<HttpEvent<unknown>> => {
   const authService = inject(AuthService);
-  const router = inject(Router);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -36,10 +34,8 @@ export const errorInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, n
         );
       }
 
-      if (error.status === 403) {
-        router.navigate(['/dashboard']);
-      }
-
+      // 403 não derruba a navegação: cada tela trata a sua leitura negada (várias consultas de fundo,
+      // como contadores e atividade, são só para quem tem a permissão).
       return throwError(() => error);
     })
   );

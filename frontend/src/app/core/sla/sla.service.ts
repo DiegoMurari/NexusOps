@@ -41,6 +41,7 @@ export interface SlaDefinitionDto {
   stopOnFirstResponse: boolean;
   breachWarning80: boolean;
   breachWarning90: boolean;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,13 +49,28 @@ export interface SlaDefinitionDto {
 export interface CreateSlaDefinitionRequest {
   name: string;
   description?: string;
-  tenantId: string;
   active?: boolean;
   appliesToType?: string;
   appliesToCategory?: string;
   appliesToPriority?: string;
   responseTimeMinutes?: number;
   resolutionTimeMinutes?: number;
+  pauseOnHold?: boolean;
+  stopOnFirstResponse?: boolean;
+}
+
+/** PATCH: campo ausente mantém o valor; texto vazio limpa um critério ("qualquer"). */
+export interface UpdateSlaDefinitionRequest {
+  name?: string;
+  description?: string;
+  active?: boolean;
+  appliesToType?: string;
+  appliesToCategory?: string;
+  appliesToPriority?: string;
+  responseTimeMinutes?: number;
+  resolutionTimeMinutes?: number;
+  pauseOnHold?: boolean;
+  stopOnFirstResponse?: boolean;
 }
 
 export interface PageResponse<T> {
@@ -94,5 +110,9 @@ export class SlaService {
 
   createDefinition(request: CreateSlaDefinitionRequest): Observable<SlaDefinitionDto> {
     return this.http.post<SlaDefinitionDto>(`${this.base}/definitions`, request);
+  }
+
+  updateDefinition(id: string, request: UpdateSlaDefinitionRequest): Observable<SlaDefinitionDto> {
+    return this.http.patch<SlaDefinitionDto>(`${this.base}/definitions/${id}`, request);
   }
 }

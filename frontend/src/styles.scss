@@ -1,96 +1,164 @@
 @use '@angular/material' as mat;
 
-// NexusOps design tokens - NOC / command-center visual identity.
-// Source: approved design proposal (design system section).
-:root {
-  color-scheme: light;
-  --bg: #F7F8FA;
-  --surface: #FFFFFF;
-  --surface-2: #F0F2F6;
-  --surface-3: #E6E9F0;
-  --border: #E2E5EC;
-  --border-strong: #CBD1DE;
-  --text: #14171F;
-  --text-muted: #5B6270;
-  --text-faint: #8890A0;
-  --accent: #3B5BFF;
-  --accent-2: #7C4DFF;
-  --accent-soft: #EEF1FF;
-  --success: #16A34A;
-  --success-soft: #E7F6ED;
-  --warning: #D97706;
-  --warning-soft: #FDF1DF;
-  --critical: #DC2626;
-  --critical-soft: #FCE8E8;
-  --info: #0284C7;
-  --info-soft: #E3F3FB;
-  --shadow: 0 1px 2px rgba(20, 23, 31, .06), 0 8px 24px rgba(20, 23, 31, .06);
-  --radius-s: 6px;
-  --radius-m: 10px;
-  --radius-l: 16px;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+// NexusOps design tokens - enterprise ITSM / IT Operations visual language.
+// Light is the default theme; dark is an alternative that only swaps values.
+// Rules: Signal Blue = action/focus/interaction; Nexus Violet = identity accent
+// only; status colors are exclusively semantic; no gradients, no pills.
+
+// ---- Theme value sets (single source for both dark entry points) ----
+@mixin nx-theme-dark {
+  color-scheme: dark;
+  --bg: #0D1017;
+  --surface: #141923;
+  --surface-2: #1B2230;
+  --surface-3: #252D3E;
+  --border: #283042;
+  --border-strong: #3A4459;
+  --text: #E6E9F0;
+  --text-muted: #A3ABBD;
+  --text-faint: #8089A0;
+
+  --accent: #7B97FF;
+  --accent-hover: #93AAFF;
+  --accent-soft: #1C2547;
+  --on-accent: #0D1017;
+  --accent-2: #A78BFF;
+  --accent-2-soft: #251C45;
+  --on-violet: #0D1017;
+
+  --success: #4ADE80;
+  --success-soft: #10291B;
+  --warning: #FBBF24;
+  --warning-soft: #2D2210;
+  --critical: #FF8A8A;
+  --critical-soft: #2E1618;
+  --info: #5CC0F5;
+  --info-soft: #0E2634;
+
+  --shadow-overlay: 0 4px 16px rgba(0, 0, 0, .4);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --bg: #0B0E14;
-    --surface: #12161F;
-    --surface-2: #1A2030;
-    --surface-3: #232B3D;
-    --border: #262D3D;
-    --border-strong: #333C52;
-    --text: #E8EAF0;
-    --text-muted: #98A0B3;
-    --text-faint: #6B7286;
-    --accent: #5B7CFF;
-    --accent-2: #9F7AFF;
-    --accent-soft: #1B2440;
-    --success: #22C55E;
-    --success-soft: #12291C;
-    --warning: #F5A524;
-    --warning-soft: #2E2311;
-    --critical: #F87171;
-    --critical-soft: #2E1717;
-    --info: #38BDF8;
-    --info-soft: #0F2733;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
-  }
+:root {
+  color-scheme: light;
+
+  // Neutrals
+  --bg: #F5F6F8;
+  --surface: #FFFFFF;
+  --surface-2: #EEF0F4;
+  --surface-3: #E3E6EC;
+  --border: #DDE1E8;
+  --border-strong: #C3C9D4;
+  --text: #161A22;
+  --text-muted: #4A5262;
+  --text-faint: #626B7C;
+
+  // Signal Blue (action, focus, interaction) and Nexus Violet (identity only)
+  --accent: #2B4BDB;
+  --accent-hover: #2340C4;
+  --accent-soft: #EAEEFF;
+  --on-accent: #FFFFFF;
+  --accent-2: #6A40E0;
+  --accent-2-soft: #F0EBFF;
+  --on-violet: #FFFFFF;
+
+  // Semantic status colors (never used for decoration)
+  --success: #17703F;
+  --success-soft: #E5F4EB;
+  --warning: #9A5200;
+  --warning-soft: #FDF0DC;
+  --critical: #BF2525;
+  --critical-soft: #FBE9E9;
+  --info: #0A64A0;
+  --info-soft: #E2F1FA;
+
+  // Elevation: static elements are flat; only floating layers get a shadow.
+  --shadow-overlay: 0 4px 16px rgba(22, 26, 34, .12);
+  --shadow: var(--shadow-overlay);
+
+  // Radius: 4 controls/badges, 6 panels/menus, 8 modals/drawers.
+  --radius-xs: 2px;
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-l: 8px;
+  --radius-full: 999px;
+
+  // Typography
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fs-xs: 11px;   // column headers and micro labels only
+  --fs-sm: 12px;
+  --fs-base: 13px; // data and auxiliary text
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  // Spacing (4px base)
+  --sp-0: 0;
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+  --sp-10: 40px;
+  --sp-11: 48px;
+
+  // Sizing
+  --control-h-sm: 28px;
+  --control-h-md: 32px;
+  --control-h-lg: 40px;
+  --row-h-compact: 36px;
+  --row-h-comfortable: 44px;
+  --page-max: 1440px;
+
+  // Interaction
+  --focus-ring: 2px solid var(--accent);
+  --disabled-opacity: .45;
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --ease: ease-out;
 }
 
 :root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #0B0E14;
-  --surface: #12161F;
-  --surface-2: #1A2030;
-  --surface-3: #232B3D;
-  --border: #262D3D;
-  --border-strong: #333C52;
-  --text: #E8EAF0;
-  --text-muted: #98A0B3;
-  --text-faint: #6B7286;
-  --accent: #5B7CFF;
-  --accent-2: #9F7AFF;
-  --accent-soft: #1B2440;
-  --success: #22C55E;
-  --success-soft: #12291C;
-  --warning: #F5A524;
-  --warning-soft: #2E2311;
-  --critical: #F87171;
-  --critical-soft: #2E1717;
-  --info: #38BDF8;
-  --info-soft: #0F2733;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
+  @include nx-theme-dark;
 }
 
 // Angular Material - structural theme once (typography/density), color applied
 // separately per palette below. Re-running all-component-themes for dark mode
-// duplicated every structural style block (the build's "duplicate styles"
-// warning); all-component-colors is the correct mixin for a second palette.
-$nexusops-primary: mat.define-palette(mat.$indigo-palette, 600, 400, 800);
+// duplicated every structural style block; all-component-colors is the correct
+// mixin for a second palette.
+$nx-signal-blue: (
+  50: #EAEEFF,
+  100: #D3DBFF,
+  200: #B0BEFF,
+  300: #7B97FF,
+  400: #5470F0,
+  500: #2B4BDB,
+  600: #2340C4,
+  700: #1C34A3,
+  800: #152880,
+  900: #0F1D5E,
+  A100: #B0BEFF,
+  A200: #7B97FF,
+  A400: #2B4BDB,
+  A700: #2340C4,
+  contrast: (
+    50: #161A22, 100: #161A22, 200: #161A22, 300: #161A22, 400: #FFFFFF,
+    500: #FFFFFF, 600: #FFFFFF, 700: #FFFFFF, 800: #FFFFFF, 900: #FFFFFF,
+    A100: #161A22, A200: #161A22, A400: #FFFFFF, A700: #FFFFFF,
+  )
+);
+
+$nexusops-primary: mat.define-palette($nx-signal-blue, 500, 300, 700);
 $nexusops-accent: mat.define-palette(mat.$deep-purple-palette, 400, 200, 600);
-$nexusops-warn: mat.define-palette(mat.$red-palette, 600, 400, 800);
+$nexusops-warn: mat.define-palette(mat.$red-palette, 700, 400, 800);
 
 $nexusops-theme: mat.define-light-theme((
   color: (
@@ -107,8 +175,9 @@ $nexusops-theme: mat.define-light-theme((
 @include mat.core();
 @include mat.all-component-themes($nexusops-theme);
 
-@media (prefers-color-scheme: dark) {
-  $nexusops-dark-primary: mat.define-palette(mat.$indigo-palette, 300, 100, 500);
+// O escuro só entra por escolha explícita (data-theme='dark'); o padrão é sempre o claro.
+:root[data-theme='dark'] {
+  $nexusops-dark-primary: mat.define-palette($nx-signal-blue, 300, 200, 400);
   $nexusops-dark-accent: mat.define-palette(mat.$deep-purple-palette, 200, 100, 400);
   $nexusops-dark-warn: mat.define-palette(mat.$red-palette, 300, 100, 500);
 
@@ -127,7 +196,7 @@ html, body {
   height: 100%;
   margin: 0;
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: var(--fs-base);
   line-height: 1.5;
   background-color: var(--bg);
   color: var(--text);
@@ -139,78 +208,208 @@ html, body {
   box-sizing: border-box;
 }
 
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
 ::selection {
   background-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 code, .mono {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
-// ---- Domain tokens: ticket status & priority (reused everywhere) ----
+// ---- Accessibility primitives ----
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Icons inside shared buttons share one size so every button reads the same.
+.nx-btn mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.nx-btn, .seg > button, .input {
+  touch-action: manipulation;
+}
+
+.nx-btn + .nx-btn {
+  margin-inline-start: var(--sp-2);
+}
+
+// ---- Linguagem de ação do NexusOps ----
+// Verbos (o que uma pessoa faz com o chamado): botão em Plex Sans, ícone de 16px e atalho visível.
+// No máximo UMA ação primária (Signal Blue chapado) por contexto; as demais são secundárias.
+.nx-verb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  height: var(--control-h-md);
+  padding: 0 var(--sp-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  font: var(--fw-medium) var(--fs-base) var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  touch-action: manipulation;
+
+  &:hover:not(:disabled) { background: var(--surface-2); border-color: var(--text-faint); }
+  &:disabled { opacity: var(--disabled-opacity); cursor: default; }
+
+  &.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    &:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  }
+
+  &.text {
+    border-color: transparent;
+    background: transparent;
+    color: var(--accent);
+    &:hover:not(:disabled) { background: var(--accent-soft); border-color: transparent; }
+  }
+
+  kbd {
+    padding: 0 var(--sp-2);
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-radius: var(--radius-xs);
+    font: var(--fw-medium) var(--fs-xs) var(--mono);
+    opacity: .85;
+  }
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--sp-4);
+  left: var(--sp-4);
+  z-index: 2000;
+  padding: var(--sp-4) var(--sp-6);
+  border-radius: var(--radius-s);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  transform: translateY(-200%);
+
+  &:focus {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ---- Domain tokens: ticket status, priority, SLA (also used by shared components) ----
+// Status text is the primary information; color only reinforces it.
 .status-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
+  height: 20px;
+  padding: 0 var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   white-space: nowrap;
 
-  &.open { color: var(--info); background: var(--info-soft); }
-  &.progress, &.in_progress { color: var(--accent); background: var(--accent-soft); }
-  &.waiting, &.pending { color: var(--warning); background: var(--warning-soft); }
-  &.hold, &.on_hold { color: var(--text-faint); background: var(--surface-3); }
-  &.resolved { color: var(--success); background: var(--success-soft); }
-  &.closed { color: var(--text-faint); background: var(--surface-2); }
-  &.reopened { color: var(--critical); background: var(--critical-soft); }
+  &.open, &.progress, &.in_progress {
+    color: var(--info);
+    background: var(--info-soft);
+    border-color: color-mix(in srgb, var(--info) 35%, transparent);
+  }
+  &.waiting, &.pending {
+    color: var(--warning);
+    background: var(--warning-soft);
+    border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  }
+  &.resolved {
+    color: var(--success);
+    background: var(--success-soft);
+    border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  }
+  &.reopened {
+    color: var(--critical);
+    background: var(--critical-soft);
+    border-color: color-mix(in srgb, var(--critical) 35%, transparent);
+  }
+  &.hold, &.on_hold, &.closed { color: var(--text-muted); background: var(--surface-2); }
 }
 
 .prio {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text);
 
   .bar {
     width: 3px;
     height: 12px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
   }
 
-  &.critical { color: var(--critical); .bar { background: var(--critical); } }
-  &.high { color: var(--warning); .bar { background: var(--warning); } }
-  &.medium { color: var(--info); .bar { background: var(--info); } }
-  &.low { color: var(--text-faint); .bar { background: var(--text-faint); } }
+  &.critical .bar { background: var(--critical); }
+  &.high .bar { background: var(--warning); }
+  &.medium .bar { background: var(--info); }
+  &.low .bar { background: var(--text-faint); }
 }
 
 .sla-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
   font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
   white-space: nowrap;
 
-  &.crit { color: var(--critical); background: var(--critical-soft); }
-  &.warn { color: var(--warning); background: var(--warning-soft); }
-  &.ok { color: var(--success); background: var(--success-soft); }
+  &.crit { color: var(--critical); background: var(--critical-soft); border-color: color-mix(in srgb, var(--critical) 35%, transparent); }
+  &.warn { color: var(--warning); background: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 35%, transparent); }
+  &.ok { color: var(--success); background: var(--success-soft); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
 }
 
-// ---- Cards & panels: border does the work, shadow reserved for floating UI ----
+// ---- Cards & panels: 1px border does the work, no shadow on static elements ----
 .card, .panel {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
-  padding: 16px;
+  padding: var(--sp-6);
 }
 
 .kpi {
@@ -235,29 +434,109 @@ code, .mono {
 
   .num {
     font-family: var(--mono);
-    font-size: 24px;
-    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fs-2xl);
+    font-weight: var(--fw-semibold);
     color: var(--text);
   }
 
   .lbl {
-    font-size: 12px;
+    font-size: var(--fs-sm);
     color: var(--text-muted);
     margin-top: 2px;
   }
 
   .trend {
-    font-size: 11px;
-    margin-top: 8px;
+    font-size: var(--fs-xs);
+    margin-top: var(--sp-4);
     display: inline-block;
-    padding: 2px 6px;
-    border-radius: 5px;
+    padding: 2px var(--sp-3);
+    border-radius: var(--radius-s);
 
     &.up { color: var(--success); background: var(--success-soft); }
     &.down { color: var(--critical); background: var(--critical-soft); }
   }
 }
 
+// ---- Form primitives (shared by all forms; states: hover/focus/disabled/error) ----
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+}
+
+.input {
+  min-height: var(--control-h-md);
+  padding: var(--sp-2) var(--sp-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease);
+
+  &::placeholder { color: var(--text-faint); }
+  &:hover:not(:disabled) { border-color: var(--text-faint); }
+  &:focus-visible { border-color: var(--accent); outline: var(--focus-ring); outline-offset: 1px; }
+  &:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; background: var(--surface-2); }
+  &[aria-invalid='true'], &.is-invalid { border-color: var(--critical); }
+}
+
+// Segmented filter (rectangular, never pills): <div class="seg" role="group"><button aria-pressed>…
+.seg {
+  display: inline-flex;
+
+  > button {
+    height: var(--control-h-sm);
+    padding: 0 var(--sp-5);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font: var(--fw-medium) var(--fs-sm) / 1 var(--sans);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease);
+
+    &:first-child { border-radius: var(--radius-s) 0 0 var(--radius-s); }
+    &:last-child { border-radius: 0 var(--radius-s) var(--radius-s) 0; }
+    &:not(:first-child) { margin-inline-start: -1px; }
+    &:hover { background: var(--surface-2); }
+    &[aria-pressed='true'] {
+      position: relative;
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  }
+}
+
+.inline-error {
+  margin: var(--sp-4) 0 0;
+  color: var(--critical);
+  font-size: var(--fs-base);
+}
+
+.inline-success {
+  margin: var(--sp-4) 0 0;
+  color: var(--success);
+  font-size: var(--fs-base);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+}
+
+// ---- Angular Material overrides (flat, compact, tokenized) ----
 .mat-mdc-card {
   border-radius: var(--radius-m);
   box-shadow: none !important;
@@ -266,8 +545,8 @@ code, .mono {
 }
 
 .mat-mdc-card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   color: var(--text);
 }
 
@@ -277,10 +556,10 @@ code, .mono {
 
 .mat-mdc-button, .mat-mdc-raised-button, .mat-mdc-outlined-button, .mat-mdc-text-button {
   border-radius: var(--radius-s);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   text-transform: none;
-  padding: 0 20px;
-  height: 38px;
+  padding: 0 var(--sp-7);
+  height: var(--control-h-md);
 }
 
 .mat-mdc-raised-button {
@@ -296,13 +575,13 @@ code, .mono {
 }
 
 .mat-mdc-tab-label {
-  font-weight: 500;
-  font-size: 0.875rem;
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-md);
   text-transform: none;
 }
 
 .mat-mdc-tooltip {
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
 }
 
 .cdk-overlay-container {
