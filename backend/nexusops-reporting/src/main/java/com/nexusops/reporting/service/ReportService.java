@@ -1,5 +1,6 @@
 package com.nexusops.reporting.service;
 
+import com.nexusops.reporting.mapper.ReportMapper;
 import com.nexusops.reporting.domain.Report;
 import com.nexusops.reporting.dto.*;
 import com.nexusops.reporting.repository.ReportRepository;
@@ -33,17 +34,17 @@ public class ReportService {
             .createdBy(userId)
             .updatedBy(userId)
             .build();
-        return ReportDto.from(reportRepository.save(report));
+        return ReportMapper.toDto(reportRepository.save(report));
     }
 
     @Transactional(readOnly = true)
     public List<ReportDto> listVisible(String tenantId, String userId) {
-        return reportRepository.findVisible(tenantId, userId).stream().map(ReportDto::from).toList();
+        return reportRepository.findVisible(tenantId, userId).stream().map(ReportMapper::toDto).toList();
     }
 
     @Transactional(readOnly = true)
     public ReportDto get(String id, String tenantId, String userId) {
-        return ReportDto.from(findVisibleOrThrow(id, tenantId, userId));
+        return ReportMapper.toDto(findVisibleOrThrow(id, tenantId, userId));
     }
 
     public ReportDto update(String id, String tenantId, String userId, UpdateReportRequest request) {
@@ -52,7 +53,7 @@ public class ReportService {
         if (request.getDescription() != null) report.setDescription(request.getDescription());
         if (request.getPublicReport() != null) report.setPublicReport(request.getPublicReport());
         report.setUpdatedBy(userId);
-        return ReportDto.from(reportRepository.save(report));
+        return ReportMapper.toDto(reportRepository.save(report));
     }
 
     public void delete(String id, String tenantId, String userId) {

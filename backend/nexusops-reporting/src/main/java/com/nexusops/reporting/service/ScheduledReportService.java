@@ -1,5 +1,6 @@
 package com.nexusops.reporting.service;
 
+import com.nexusops.reporting.mapper.ScheduledReportMapper;
 import com.nexusops.reporting.domain.ScheduledReport;
 import com.nexusops.reporting.dto.CreateScheduledReportRequest;
 import com.nexusops.reporting.dto.ReportDto;
@@ -52,7 +53,7 @@ public class ScheduledReportService {
             .createdBy(userId)
             .updatedBy(userId)
             .build();
-        return ScheduledReportDto.from(scheduledReportRepository.save(scheduled));
+        return ScheduledReportMapper.toDto(scheduledReportRepository.save(scheduled));
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +62,7 @@ public class ScheduledReportService {
             .map(ReportDto::getId).collect(Collectors.toSet());
         return scheduledReportRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
             .filter(s -> visibleReportIds.contains(s.getReportId()))
-            .map(ScheduledReportDto::from).toList();
+            .map(ScheduledReportMapper::toDto).toList();
     }
 
     public ScheduledReportDto update(String id, String tenantId, String userId, UpdateScheduledReportRequest request) {
@@ -72,7 +73,7 @@ public class ScheduledReportService {
                 ? computeNextRun(scheduled.getScheduleCron(), scheduled.getTimezone()) : null);
         }
         scheduled.setUpdatedBy(userId);
-        return ScheduledReportDto.from(scheduledReportRepository.save(scheduled));
+        return ScheduledReportMapper.toDto(scheduledReportRepository.save(scheduled));
     }
 
     public void delete(String id, String tenantId, String userId) {

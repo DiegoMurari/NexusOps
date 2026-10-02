@@ -5,6 +5,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
@@ -49,9 +51,12 @@ class LayerRulesTest {
 
     @Test
     void dtoClassesShouldNotContainBusinessLogic() {
+        // Enums do domínio são tipos-valor do contrato (status, prioridade...) e podem aparecer nos DTOs;
+        // entidades, serviços e repositórios não.
         ArchRule rule = noClasses()
             .that().resideInAPackage("..dto..")
-            .should().accessClassesThat().resideInAnyPackage("..service..", "..repository..", "..domain..");
+            .should().accessClassesThat(resideInAnyPackage("..service..", "..repository..", "..domain..")
+                .and(not(assignableTo(Enum.class))));
         rule.check(ALL_CLASSES);
     }
 

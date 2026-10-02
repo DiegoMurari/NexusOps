@@ -19,13 +19,4 @@ public class ReportDto {
     private boolean publicReport;
     private Instant createdAt;
     private Instant updatedAt;
-
-    public static ReportDto from(Report r) {
-        return ReportDto.builder()
-            .id(r.getId()).name(r.getName()).description(r.getDescription())
-            .ownerId(r.getOwnerId()).reportType(r.getReportType())
-            .publicReport(r.isPublicReport())
-            .createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
-            .build();
-    }
 }

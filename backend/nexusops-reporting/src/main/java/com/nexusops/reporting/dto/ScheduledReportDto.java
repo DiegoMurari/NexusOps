@@ -4,7 +4,6 @@ import com.nexusops.reporting.domain.ScheduledReport;
 import lombok.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -26,15 +25,4 @@ public class ScheduledReportDto {
     private Instant nextRunAt;
     private String lastRunStatus;
     private Instant createdAt;
-
-    public static ScheduledReportDto from(ScheduledReport s) {
-        return ScheduledReportDto.builder()
-            .id(s.getId()).reportId(s.getReportId()).name(s.getName())
-            .scheduleCron(s.getScheduleCron()).timezone(s.getTimezone())
-            .format(s.getFormat()).deliveryMethod(s.getDeliveryMethod())
-            .recipients(new ArrayList<>(s.getRecipients()))
-            .active(s.isActive()).lastRunAt(s.getLastRunAt()).nextRunAt(s.getNextRunAt())
-            .lastRunStatus(s.getLastRunStatus()).createdAt(s.getCreatedAt())
-            .build();
-    }
 }

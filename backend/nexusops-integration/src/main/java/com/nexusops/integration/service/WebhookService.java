@@ -1,5 +1,6 @@
 package com.nexusops.integration.service;
 
+import com.nexusops.integration.mapper.WebhookMapper;
 import com.nexusops.integration.domain.Webhook;
 import com.nexusops.integration.dto.CreateWebhookRequest;
 import com.nexusops.integration.dto.UpdateWebhookRequest;
@@ -39,12 +40,12 @@ public class WebhookService {
         if (request.getTimeoutSeconds() != null) {
             webhook.setTimeoutSeconds(request.getTimeoutSeconds());
         }
-        return WebhookDto.from(webhookRepository.save(webhook));
+        return WebhookMapper.toDto(webhookRepository.save(webhook));
     }
 
     @Transactional(readOnly = true)
     public List<WebhookDto> list(String tenantId) {
-        return webhookRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream().map(WebhookDto::from).toList();
+        return webhookRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream().map(WebhookMapper::toDto).toList();
     }
 
     public WebhookDto update(String id, UpdateWebhookRequest request, String tenantId, String userId) {
@@ -73,7 +74,7 @@ public class WebhookService {
             webhook.setTimeoutSeconds(request.getTimeoutSeconds());
         }
         webhook.setUpdatedBy(userId);
-        return WebhookDto.from(webhookRepository.save(webhook));
+        return WebhookMapper.toDto(webhookRepository.save(webhook));
     }
 
     public void delete(String id, String tenantId) {
