@@ -69,11 +69,19 @@ final class WebhookUrlValidator {
         } catch (UnknownHostException e) {
             throw new ValidationException("Webhook host is not valid");
         }
-        byte[] bytes = address.getAddress();
-        boolean uniqueLocalV6 = bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
-        if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
-            || address.isSiteLocalAddress() || address.isMulticastAddress() || uniqueLocalV6) {
+        if (isForbiddenAddress(address)) {
             throw new ValidationException("Webhook host is not allowed");
         }
+    }
+
+    /**
+     * Endereço que nunca pode ser alvo de uma chamada de saída. Usado também depois de resolver o DNS,
+     * logo antes de conectar, para fechar a brecha de um nome público que passa a apontar para a rede interna.
+     */
+    static boolean isForbiddenAddress(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        boolean uniqueLocalV6 = bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+        return address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
+            || address.isSiteLocalAddress() || address.isMulticastAddress() || uniqueLocalV6;
     }
 }

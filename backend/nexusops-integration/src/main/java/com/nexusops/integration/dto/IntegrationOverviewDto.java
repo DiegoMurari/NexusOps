@@ -12,8 +12,16 @@ public class IntegrationOverviewDto {
 
     private long webhooks;
     private long activeWebhooks;
+    /** Webhooks cuja última entrega falhou. */
+    private long failingWebhooks;
     private long connectors;
+    private long disabledConnectors;
+    /** Conectores cuja última verificação de alcance falhou. */
+    private long failingConnectors;
     private Map<String, Long> connectorsByType;
-    /** False while outbound delivery/sync is not implemented; the UI states this to users. */
+    /**
+     * Verdadeiro quando existe saída HTTP real (hoje: evento de teste e verificação de alcance). O envio dos
+     * eventos do sistema para os webhooks e a sincronização com Jira/Slack ainda não existem; a tela diz isso.
+     */
     private boolean deliveryAvailable;
 }

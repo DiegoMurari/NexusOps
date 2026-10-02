@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { IntegrationService, WebhookDto } from '../../../core/integrations/integration.service';
+import { IntegrationService, WebhookDto, describeResult } from '../../../core/integrations/integration.service';
 import {
   ButtonComponent, DataTableComponent, EmptyStateComponent, NoticeComponent, NxCellDirective, NxColumn,
   PageHeaderComponent, StatusBadgeComponent,
@@ -24,7 +24,11 @@ import {
       </button>
     </nx-page-header>
 
-    <nx-notice tone="warning">Os webhooks são cadastrados, mas o envio de eventos ainda não está disponível. Somente URLs https públicas são aceitas.</nx-notice>
+    <nx-notice tone="info">Use “Enviar teste” para mandar um evento assinado ao endereço e ver se ele responde. O envio automático dos eventos do NexusOps ainda não está disponível. Somente URLs https públicas são aceitas.</nx-notice>
+
+    @if (testResult(); as t) {
+      <nx-notice [tone]="t.ok ? 'success' : 'critical'">{{ t.text }}</nx-notice>
+    }
 
     @if (showForm()) {
       <form class="card form-card" (submit)="submit($event)">
@@ -68,7 +72,19 @@ import {
         <ng-template nxCell="status" let-w>
           <nx-status-badge [tone]="w.status === 'ACTIVE' ? 'success' : 'neutral'">{{ w.status === 'ACTIVE' ? 'Ativo' : 'Inativo' }}</nx-status-badge>
         </ng-template>
+        <ng-template nxCell="lastDelivery" let-w>
+          @if (w.lastDeliveryStatus) {
+            <nx-status-badge [tone]="w.lastDeliveryStatus === 'SUCCESS' ? 'success' : 'critical'">{{ w.lastDeliveryStatus === 'SUCCESS' ? 'Entregue' : 'Falhou' }}</nx-status-badge>
+            <span class="when">{{ w.lastDeliveryAt | date:'dd/MM HH:mm' }}{{ deliveryDetail(w) }}</span>
+          } @else {
+            <span class="when">Nunca testado</span>
+          }
+        </ng-template>
         <ng-template nxCell="actions" let-w>
+          <button nxButton variant="icon" size="sm" type="button" [attr.aria-label]="'Enviar teste para ' + w.name"
+                  title="Enviar teste" [loading]="testingId() === w.id" [disabled]="testingId() !== null" (click)="test(w)">
+            <mat-icon>send</mat-icon>
+          </button>
           <button nxButton variant="icon" size="sm" type="button" [attr.aria-label]="(w.status === 'ACTIVE' ? 'Desativar ' : 'Ativar ') + w.name"
                   [title]="w.status === 'ACTIVE' ? 'Desativar' : 'Ativar'" (click)="toggle(w)">
             <mat-icon>{{ w.status === 'ACTIVE' ? 'pause' : 'play_arrow' }}</mat-icon>
@@ -88,6 +104,7 @@ import {
     .form-card { padding: var(--sp-7); margin-bottom: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-6); }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-6); }
     .inline-error { margin: 0; }
+    .when { margin-inline-start: var(--sp-3); font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
   `]
 })
 export class WebhookConfigComponent implements OnInit {
@@ -97,6 +114,7 @@ export class WebhookConfigComponent implements OnInit {
     { key: 'events', header: 'Eventos', muted: true },
     { key: 'hasSecret', header: 'Assinado', muted: true },
     { key: 'status', header: 'Status' },
+    { key: 'lastDelivery', header: 'Último teste' },
     { key: 'actions', header: 'Ações', align: 'end', hideHeader: true },
   ];
 
@@ -104,6 +122,8 @@ export class WebhookConfigComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
   actionError = signal<string | null>(null);
+  testingId = signal<string | null>(null);
+  testResult = signal<{ ok: boolean; text: string } | null>(null);
 
   showForm = signal(false);
   saving = signal(false);
@@ -168,6 +188,34 @@ export class WebhookConfigComponent implements OnInit {
       error: err => {
         this.saving.set(false);
         this.formError.set(err?.error?.detail ?? err?.error?.message ?? 'Não foi possível salvar o webhook.');
+      }
+    });
+  }
+
+  deliveryDetail(w: WebhookDto): string {
+    if (w.lastDeliveryStatus === 'SUCCESS') return w.lastDeliveryHttpStatus ? ` · HTTP ${w.lastDeliveryHttpStatus}` : '';
+    return w.lastError ? ` · ${w.lastError.startsWith('HTTP_') ? w.lastError.replace('_', ' ') : describeResult(w.lastError)}` : '';
+  }
+
+  /** Manda um evento "ping" assinado e mostra o resultado; o backend também registra na atividade. */
+  test(w: WebhookDto): void {
+    this.actionError.set(null);
+    this.testResult.set(null);
+    this.testingId.set(w.id);
+    this.integrationService.testWebhook(w.id).subscribe({
+      next: r => {
+        this.testingId.set(null);
+        this.testResult.set({
+          ok: r.outcome === 'SUCCESS',
+          text: r.outcome === 'SUCCESS'
+            ? `“${w.name}” respondeu (${describeResult(r.message)}) em ${r.durationMs} ms.`
+            : `“${w.name}” não recebeu o teste: ${describeResult(r.message)}.`,
+        });
+        this.load();
+      },
+      error: err => {
+        this.testingId.set(null);
+        this.actionError.set(err?.error?.detail ?? err?.error?.message ?? 'Não foi possível enviar o teste.');
       }
     });
   }

@@ -20,6 +20,12 @@ public class WebhookDto {
     private Webhook.WebhookStatus status;
     private int timeoutSeconds;
     private boolean hasSecret;
+    private Instant lastDeliveryAt;
+    /** SUCCESS ou FAILURE; nulo se nunca houve tentativa. */
+    private String lastDeliveryStatus;
+    private Integer lastDeliveryHttpStatus;
+    /** Categoria curta do erro (TIMEOUT, DNS_FAILURE...), nunca texto livre do destino. */
+    private String lastError;
     private Instant createdAt;
     private Instant updatedAt;
 }

@@ -63,6 +63,20 @@ public class Webhook implements TenantAware {
     @Column(name = "headers", columnDefinition = "jsonb")
     private String headers;
 
+    /** Resultado da última entrega (hoje: o evento de teste). SUCCESS ou FAILURE; sem corpo nem segredo. */
+    @Column(name = "last_delivery_at")
+    private Instant lastDeliveryAt;
+
+    @Column(name = "last_delivery_status", length = 20)
+    private String lastDeliveryStatus;
+
+    @Column(name = "last_delivery_http_status")
+    private Integer lastDeliveryHttpStatus;
+
+    /** Categoria curta do erro (ex.: TIMEOUT, BLOCKED_ADDRESS), nunca o texto da exceção. */
+    @Column(name = "last_error", length = 255)
+    private String lastError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

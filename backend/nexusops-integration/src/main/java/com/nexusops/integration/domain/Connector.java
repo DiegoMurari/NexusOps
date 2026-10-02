@@ -59,6 +59,21 @@ public class Connector implements TenantAware {
     @Column(name = "sync_schedule_cron", length = 100)
     private String syncScheduleCron;
 
+    /** Conector desligado não é verificado nem usado; a configuração é mantida. */
+    @Column(name = "enabled", nullable = false)
+    @Builder.Default
+    private boolean enabled = true;
+
+    /** Última verificação de alcance do endereço configurado. SUCCESS ou FAILURE. */
+    @Column(name = "last_check_at")
+    private Instant lastCheckAt;
+
+    @Column(name = "last_check_status", length = 20)
+    private String lastCheckStatus;
+
+    @Column(name = "last_check_message", length = 255)
+    private String lastCheckMessage;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

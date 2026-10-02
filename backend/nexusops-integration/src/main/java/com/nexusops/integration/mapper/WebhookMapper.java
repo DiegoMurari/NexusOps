@@ -17,6 +17,8 @@ public final class WebhookMapper {
             .events(new TreeSet<>(w.getEvents())).status(w.getStatus())
             .timeoutSeconds(w.getTimeoutSeconds())
             .hasSecret(w.getSecret() != null && !w.getSecret().isBlank())
+            .lastDeliveryAt(w.getLastDeliveryAt()).lastDeliveryStatus(w.getLastDeliveryStatus())
+            .lastDeliveryHttpStatus(w.getLastDeliveryHttpStatus()).lastError(w.getLastError())
             .createdAt(w.getCreatedAt()).updatedAt(w.getUpdatedAt())
             .build();
     }

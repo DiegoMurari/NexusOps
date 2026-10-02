@@ -20,4 +20,7 @@ public class UpdateConnectorRequest {
 
     @Size(max = 100)
     private String syncScheduleCron;
+
+    /** Liga ou desliga o conector sem perder a configuração. */
+    private Boolean enabled;
 }
