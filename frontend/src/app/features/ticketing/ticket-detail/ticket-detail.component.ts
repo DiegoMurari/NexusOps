@@ -283,8 +283,8 @@ function verbFor(from: TicketStatus, target: TicketStatus): { label: string; ico
               <dt>Tipo</dt><dd>{{ t.ticketType }}</dd>
               <dt>Urgência</dt><dd>{{ t.urgency ? priorityLabel(t.urgency) : '—' }}</dd>
               <dt>Impacto</dt><dd>{{ t.impact ? priorityLabel(t.impact) : '—' }}</dd>
-              <dt>Solicitante</dt><dd class="mono">{{ t.reporterId }}</dd>
-              <dt>Responsável</dt><dd class="mono">{{ t.assigneeId || '—' }}</dd>
+              <dt>Solicitante</dt><dd>{{ context()?.reporterName ?? t.reporterId }}</dd>
+              <dt>Responsável</dt><dd>{{ context()?.assigneeName ?? (t.assigneeId || '—') }}</dd>
               <dt>Grupo</dt><dd class="mono">{{ t.groupId || '—' }}</dd>
               <dt>Criado em</dt><dd class="mono">{{ t.createdAt | date:'dd/MM/yyyy HH:mm' }}</dd>
               <dt>Atualizado em</dt><dd class="mono">{{ t.updatedAt | date:'dd/MM/yyyy HH:mm' }}</dd>
@@ -440,7 +440,7 @@ export class TicketDetailComponent implements OnInit {
     const t = this.ticket();
     if (!t) return [];
     const nodes: ChainNode[] = [{ kind: 'Ticket', value: t.ticketNumber, tone: 'focus' }];
-    nodes.push({ kind: 'Solicitante', value: t.reporterId });
+    nodes.push({ kind: 'Solicitante', value: this.context()?.reporterName ?? t.reporterId });
     if (t.ciReference) nodes.push({ kind: 'Ativo', value: t.ciReference });
     const s = this.sla();
     if (s) nodes.push({ kind: 'SLA', value: s.label, tone: s.state === 'crit' ? 'crit' : undefined });

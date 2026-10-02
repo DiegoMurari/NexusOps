@@ -228,6 +228,7 @@ export class DashboardComponent implements OnInit {
 
   private tickets = signal<TicketDto[]>([]);
   private breaches = signal(0);
+  private focusReporter = signal<{ id: string; name: string } | null>(null);
   private counts = signal<{ unassigned: number } | null>(null);
   private assets = signal<{ total: number; maintenance: number } | null>(null);
   private automations = signal<{ active: number; connectors: number; delivery: boolean } | null>(null);
@@ -255,7 +256,7 @@ export class DashboardComponent implements OnInit {
     const sla = top.slaDefinitionId ? slaFromTicket(top) : null;
     const chain: ChainNode[] = [
       { kind: 'Ticket', value: top.ticketNumber, sub: STATUS_LABELS[top.status].toLowerCase(), tone: 'focus' },
-      { kind: 'Solicitante', value: top.reporterId },
+      { kind: 'Solicitante', value: this.focusReporter()?.id === top.id ? this.focusReporter()!.name : top.reporterId },
     ];
     if (top.ciReference) chain.push({ kind: 'Ativo', value: top.ciReference });
     if (sla) {
@@ -357,15 +358,24 @@ export class DashboardComponent implements OnInit {
       assets: this.can('ASSET') ? this.assetService.list({ size: 1 }).pipe(catchError(() => of(null))) : of(null),
       maintenance: this.can('ASSET') ? this.assetService.list({ status: 'MAINTENANCE', size: 1 }).pipe(catchError(() => of(null))) : of(null),
       automations: this.can('INTEGRATION') ? this.integrationService.overview().pipe(catchError(() => of(null))) : of(null),
-      audit: this.can('AUDIT') ? this.platformService.listAuditLogs(0, 5).pipe(catchError(() => of(null))) : of(null),
+      audit: this.can('AUDIT') ? this.platformService.listAuditLogs(0, 100).pipe(catchError(() => of(null))) : of(null),
     }).subscribe(r => {
       this.tickets.set(r.tickets?.content ?? []);
+      // O chamado em foco mostra o nome de quem pediu, não o identificador.
+      const f = this.focus();
+      if (f) {
+        this.ticketService.context(f.ticket.id).subscribe({
+          next: c => { if (c.reporterName) this.focusReporter.set({ id: f.ticket.id, name: c.reporterName }); },
+          error: () => undefined,
+        });
+      }
       this.breaches.set(r.breaches?.length ?? 0);
       this.assets.set(r.assets ? { total: r.assets.totalElements, maintenance: r.maintenance?.totalElements ?? 0 } : null);
       this.automations.set(r.automations
         ? { active: r.automations.activeWebhooks, connectors: r.automations.connectors, delivery: r.automations.deliveryAvailable }
         : null);
-      this.activity.set((r.audit?.content ?? []).map(log => ({
+      // Entradas no sistema não são atividade operacional: mostra as cinco últimas ações de verdade.
+      this.activity.set((r.audit?.content ?? []).filter(log => !/LOGIN|LOGOUT/.test(`${log.action ?? ""} ${log.eventType}`)).slice(0, 5).map(log => ({
         id: log.id,
         who: log.userId?.split('@')[0] ?? 'sistema',
         what: this.describeAuditLog(log),

@@ -87,10 +87,10 @@ import { ButtonComponent, EmptyStateComponent, StatusBadgeComponent } from '../.
     .list { list-style: none; margin: 0; padding: 0; display: grid; }
     .list li { border-top: 1px solid var(--border); }
     .list li:first-child { border-top: 0; }
-    .row { display: grid; grid-template-columns: 112px 1fr auto; gap: var(--sp-5); align-items: center; padding: var(--sp-5) var(--sp-3); text-decoration: none; color: var(--text); }
+    .row { display: grid; grid-template-columns: 176px 1fr auto; gap: var(--sp-5); align-items: center; padding: var(--sp-5) var(--sp-3); text-decoration: none; color: var(--text); }
     .row:hover { background: var(--surface-2); }
     .row:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
-    .num { color: var(--text-muted); font-size: var(--fs-xs); }
+    .num { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
     .main { display: grid; gap: var(--sp-2); min-width: 0; }
     .main b { font-weight: var(--fw-medium); overflow-wrap: anywhere; }
     .meta, .why { font-size: var(--fs-sm); color: var(--text-muted); }

@@ -286,9 +286,9 @@ export class RoutingManagementComponent implements OnInit {
   readonly priorities = PRIORITIES;
   readonly columns: NxColumn[] = [
     { key: 'position', header: '#' },
-    { key: 'name', header: 'Regra', rowHeader: true },
-    { key: 'when', header: 'Quando', muted: true },
-    { key: 'then', header: 'Então' },
+    { key: 'name', header: 'Regra', rowHeader: true, maxWidth: '260px' },
+    { key: 'when', header: 'Quando', muted: true, maxWidth: '260px' },
+    { key: 'then', header: 'Então', maxWidth: '260px' },
     { key: 'active', header: 'Status' },
     { key: 'order', header: 'Ordem' },
   ];

@@ -116,7 +116,7 @@ const STATUS_FILTERS: { value: TicketStatus | null; label: string }[] = [
         @if (queueName(t.queueId); as n) { {{ n }} } @else { <span class="none">—</span> }
       </ng-template>
       <ng-template nxCell="assignee" let-t>
-        @if (t.assigneeId) { {{ t.assigneeId }} } @else { <span class="unassigned">Sem responsável</span> }
+        @if (t.assigneeId) { <span [title]="t.assigneeId">{{ person(t.assigneeId) }}</span> } @else { <span class="unassigned">Sem responsável</span> }
       </ng-template>
       <ng-template nxCell="status" let-t>
         <nx-status-badge [tone]="tone(t.status)" [glyph]="glyph(t.status)">{{ label(t.status) }}</nx-status-badge>
@@ -147,7 +147,7 @@ const STATUS_FILTERS: { value: TicketStatus | null; label: string }[] = [
     }
   `,
   styles: [`
-    :host { display: grid; gap: var(--sp-6); }
+    :host { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); }
     .head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); }
     h1 { margin: 0; font-size: var(--fs-xl); line-height: 28px; font-weight: var(--fw-semibold); }
     .nx-verb mat-icon { width: 16px; height: 16px; font-size: 16px; }
@@ -224,7 +224,7 @@ export class TicketListComponent implements OnInit {
 
   columns: NxColumn[] = [
     { key: 'ticketNumber', header: 'Número', rowHeader: true },
-    { key: 'title', header: 'Título', maxWidth: '380px' },
+    { key: 'title', header: 'Título', maxWidth: '250px' },
     { key: 'queue', header: 'Fila' },
     { key: 'assignee', header: 'Responsável' },
     { key: 'status', header: 'Status' },
@@ -262,6 +262,11 @@ export class TicketListComponent implements OnInit {
     this.queueId.set(id || null);
     this.page.set(0);
     this.load();
+  }
+
+  /** O responsável é guardado pelo e-mail; na lista basta a parte antes do @, com o e-mail completo no tooltip. */
+  person(email: string): string {
+    return email.split('@')[0];
   }
 
   queueName(id: string | null): string | null {
