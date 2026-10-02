@@ -1,104 +1,106 @@
 package com.nexusops.sla.service;
 
 import com.nexusops.sla.domain.BusinessCalendar;
-import com.nexusops.sla.domain.SlaBreach;
 import com.nexusops.sla.domain.SlaDefinition;
-import com.nexusops.sla.dto.SlaCalculationResultDto;
+import com.nexusops.sla.dto.SlaTargetsDto;
 import com.nexusops.sla.repository.BusinessCalendarRepository;
-import com.nexusops.sla.repository.SlaBreachRepository;
 import com.nexusops.sla.repository.SlaDefinitionRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.Comparator;
+import java.util.Optional;
 
+/**
+ * Cálculo de metas de SLA. Não guarda estado: quem aplica o SLA a um chamado (módulo ticketing) pede as
+ * metas daqui e as persiste no ciclo. Os prazos respeitam o calendário comercial da definição (ou o
+ * calendário padrão do tenant) e podem ser estendidos quando o relógio fica pausado.
+ */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class SlaCalculationService {
 
     private final SlaDefinitionRepository slaDefinitionRepository;
     private final BusinessCalendarRepository businessCalendarRepository;
-    private final SlaBreachRepository slaBreachRepository;
+
+    /**
+     * Escolhe a definição aplicável e calcula os prazos a partir de {@code start}. Uma definição explícita
+     * (por exemplo a da categoria) vale se estiver ativa no tenant; senão vence a mais específica entre as
+     * que casam com tipo, categoria, prioridade e perfil do cliente.
+     */
+    @Transactional(readOnly = true)
+    public Optional<SlaTargetsDto> resolveTargets(String tenantId, String type, String categoryId, String priority,
+                                                  String customerTier, String explicitDefinitionId, Instant start) {
+        SlaDefinition definition = null;
+        if (explicitDefinitionId != null) {
+            definition = slaDefinitionRepository.findById(explicitDefinitionId)
+                .filter(d -> tenantId.equals(d.getTenantId()) && d.isActive())
+                .orElse(null);
+        }
+        if (definition == null) {
+            // Parâmetro nulo em comparação JPQL não tem tipo no PostgreSQL: vazio nunca casa com um critério.
+            definition = slaDefinitionRepository.findMatchingDefinitions(
+                    tenantId, nz(type), nz(categoryId), nz(priority), nz(customerTier)).stream()
+                .max(BEST_MATCH)
+                .orElse(null);
+        }
+        if (definition == null) {
+            return Optional.empty();
+        }
+
+        BusinessCalendar calendar = getBusinessCalendar(definition, tenantId);
+        return Optional.of(new SlaTargetsDto(
+            definition.getId(),
+            definition.getName(),
+            definition.getVersion(),
+            dueAfter(start, definition.getResponseTimeMinutes(), calendar),
+            dueAfter(start, definition.getResolutionTimeMinutes(), calendar),
+            definition.isPauseOnHold()));
+    }
+
+    /** Mais critérios preenchidos = mais específica; empate: revisão mais nova. */
+    private static final Comparator<SlaDefinition> BEST_MATCH = Comparator
+        .comparingInt(SlaCalculationService::specificity)
+        .thenComparing(SlaDefinition::getVersion)
+        .thenComparing(SlaDefinition::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder()));
+
+    private static int specificity(SlaDefinition d) {
+        int score = 0;
+        if (d.getAppliesToType() != null) score++;
+        if (d.getAppliesToCategory() != null) score++;
+        if (d.getAppliesToPriority() != null) score++;
+        if (d.getAppliesToCustomerTier() != null) score++;
+        return score;
+    }
+
+    private static String nz(String value) {
+        return value == null ? "" : value;
+    }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "sla-calculations", key = "#ticketId + ':' + #tenantId", unless = "#result == null")
-    public SlaCalculationResultDto calculateSlaForTicket(String ticketId, String tenantId, Instant createdAt,
-                                                         String type, String category, String priority,
-                                                         String customerTier, String status,
-                                                         Instant firstResponseAt, Instant resolvedAt) {
-        
-        List<SlaDefinition> definitions = slaDefinitionRepository.findMatchingDefinitions(
-            tenantId, type, category, priority, customerTier);
+    public boolean pausesOnHold(String definitionId) {
+        return slaDefinitionRepository.findById(definitionId).map(SlaDefinition::isPauseOnHold).orElse(false);
+    }
 
-        if (definitions.isEmpty()) {
-            return null;
+    /**
+     * Estende um prazo pelo tempo em que o relógio ficou pausado: em horário útil quando há calendário
+     * (pausa fora do expediente não estende nada), em tempo corrido quando não há.
+     */
+    @Transactional(readOnly = true)
+    public Instant extendDue(String definitionId, String tenantId, Instant due, Instant pausedFrom, Instant pausedTo) {
+        if (due == null || !pausedTo.isAfter(pausedFrom)) {
+            return due;
         }
-
-        SlaDefinition definition = definitions.get(0);
-        BusinessCalendar calendar = getBusinessCalendar(definition, tenantId);
-
-        Instant now = Instant.now();
-        Instant responseDueAt = calculateDueTime(createdAt, definition.getResponseTimeMinutes(), calendar);
-        Instant resolutionDueAt = calculateDueTime(createdAt, definition.getResolutionTimeMinutes(), calendar);
-
-        boolean paused = definition.isPauseOnHold() && "ON_HOLD".equals(status);
-        Instant pausedAt = null;
-
-        Long responseRemainingMinutes = null;
-        Long resolutionRemainingMinutes = null;
-        Integer responsePercentage = null;
-        Integer resolutionPercentage = null;
-        Boolean responseBreachImminent = false;
-        Boolean resolutionBreachImminent = false;
-
-        if (!paused) {
-            if (firstResponseAt != null) {
-                responseRemainingMinutes = 0L;
-                responsePercentage = 100;
-            } else if (definition.getResponseTimeMinutes() != null) {
-                responseRemainingMinutes = calculateRemainingMinutes(now, responseDueAt, calendar, paused);
-                if (definition.getResponseTimeMinutes() > 0) {
-                    long total = definition.getResponseTimeMinutes();
-                    long elapsed = total - responseRemainingMinutes;
-                    responsePercentage = (int) ((elapsed * 100) / total);
-                    responseBreachImminent = responsePercentage >= 80 && responsePercentage < 100;
-                }
-            }
-
-            if (resolvedAt != null) {
-                resolutionRemainingMinutes = 0L;
-                resolutionPercentage = 100;
-            } else if (definition.getResolutionTimeMinutes() != null) {
-                resolutionRemainingMinutes = calculateRemainingMinutes(now, resolutionDueAt, calendar, paused);
-                if (definition.getResolutionTimeMinutes() > 0) {
-                    long total = definition.getResolutionTimeMinutes();
-                    long elapsed = total - resolutionRemainingMinutes;
-                    resolutionPercentage = (int) ((elapsed * 100) / total);
-                    resolutionBreachImminent = resolutionPercentage >= 80 && resolutionPercentage < 100;
-                }
-            }
+        BusinessCalendar calendar = slaDefinitionRepository.findById(definitionId)
+            .map(d -> getBusinessCalendar(d, tenantId))
+            .orElse(null);
+        if (calendar == null) {
+            return due.plus(Duration.between(pausedFrom, pausedTo));
         }
-
-        return SlaCalculationResultDto.builder()
-            .ticketId(ticketId)
-            .slaDefinitionId(definition.getId())
-            .responseDueAt(responseDueAt)
-            .resolutionDueAt(resolutionDueAt)
-            .responseRemainingMinutes(responseRemainingMinutes)
-            .resolutionRemainingMinutes(resolutionRemainingMinutes)
-            .responsePercentage(responsePercentage)
-            .resolutionPercentage(resolutionPercentage)
-            .responseBreachImminent(responseBreachImminent)
-            .resolutionBreachImminent(resolutionBreachImminent)
-            .paused(paused)
-            .pausedAt(pausedAt)
-            .build();
+        long businessMinutes = businessMinutesBetween(pausedFrom, pausedTo, calendar);
+        return businessMinutes <= 0 ? due : dueAfter(due, (int) Math.min(businessMinutes, Integer.MAX_VALUE), calendar);
     }
 
     @Transactional(readOnly = true)
@@ -109,7 +111,8 @@ public class SlaCalculationService {
         return businessCalendarRepository.findByTenantIdAndDefaultCalendarTrue(tenantId).orElse(null);
     }
 
-    private Instant calculateDueTime(Instant start, Integer minutes, BusinessCalendar calendar) {
+    /** Prazo = início + minutos, contando só o expediente quando há calendário. Sem meta devolve nulo. */
+    public Instant dueAfter(Instant start, Integer minutes, BusinessCalendar calendar) {
         if (minutes == null || minutes <= 0) {
             return null;
         }
@@ -121,8 +124,10 @@ public class SlaCalculationService {
         ZoneId zone = ZoneId.of(calendar.getTimezone());
         ZonedDateTime zdt = start.atZone(zone);
         long remainingMinutes = minutes;
+        // Limite de segurança: um calendário sem nenhum dia útil não pode travar o chamador.
+        int guard = 0;
 
-        while (remainingMinutes > 0) {
+        while (remainingMinutes > 0 && guard++ < 3660) {
             LocalDate currentDate = zdt.toLocalDate();
             BusinessCalendar.BusinessHours hours = calendar.getBusinessHours(currentDate);
 
@@ -152,36 +157,28 @@ public class SlaCalculationService {
         return zdt.toInstant();
     }
 
-    private Long calculateRemainingMinutes(Instant now, Instant dueAt, BusinessCalendar calendar, boolean paused) {
-        if (paused || dueAt == null) {
-            return null;
-        }
-
-        if (now.isAfter(dueAt)) {
+    /** Minutos de expediente entre dois instantes. */
+    public long businessMinutesBetween(Instant from, Instant to, BusinessCalendar calendar) {
+        if (!to.isAfter(from)) {
             return 0L;
         }
-
         if (calendar == null) {
-            return Duration.between(now, dueAt).toMinutes();
+            return Duration.between(from, to).toMinutes();
         }
 
         ZoneId zone = ZoneId.of(calendar.getTimezone());
-        ZonedDateTime nowZdt = now.atZone(zone);
-        ZonedDateTime dueZdt = dueAt.atZone(zone);
+        ZonedDateTime dueZdt = to.atZone(zone);
+        ZonedDateTime current = from.atZone(zone);
+        long total = 0;
+        int guard = 0;
 
-        long remaining = 0;
-        ZonedDateTime current = nowZdt;
-
-        while (current.isBefore(dueZdt)) {
+        while (current.isBefore(dueZdt) && guard++ < 3660) {
             LocalDate currentDate = current.toLocalDate();
             BusinessCalendar.BusinessHours hours = calendar.getBusinessHours(currentDate);
 
             if (hours != null && hours.isWorkingDay()) {
-                LocalTime startTime = hours.getStart();
-                LocalTime endTime = hours.getEnd();
-
-                ZonedDateTime dayStart = currentDate.atTime(startTime).atZone(zone);
-                ZonedDateTime dayEnd = currentDate.atTime(endTime).atZone(zone);
+                ZonedDateTime dayStart = currentDate.atTime(hours.getStart()).atZone(zone);
+                ZonedDateTime dayEnd = currentDate.atTime(hours.getEnd()).atZone(zone);
 
                 if (current.isBefore(dayStart)) {
                     current = dayStart;
@@ -189,49 +186,13 @@ public class SlaCalculationService {
 
                 if (current.isBefore(dayEnd) && current.isBefore(dueZdt)) {
                     ZonedDateTime effectiveEnd = dayEnd.isBefore(dueZdt) ? dayEnd : dueZdt;
-                    remaining += Duration.between(current, effectiveEnd).toMinutes();
+                    total += Duration.between(current, effectiveEnd).toMinutes();
                 }
             }
 
             current = current.toLocalDate().plusDays(1).atStartOfDay(zone);
         }
 
-        return remaining;
-    }
-
-    @Transactional
-    public void startSlaTimer(String ticketId) {
-        log.debug("Starting SLA timer for ticket: {}", ticketId);
-    }
-
-    @Transactional
-    public void pauseSlaTimer(String ticketId) {
-        log.debug("Pausing SLA timer for ticket: {}", ticketId);
-    }
-
-    @Transactional
-    public void resumeSlaTimer(String ticketId) {
-        log.debug("Resuming SLA timer for ticket: {}", ticketId);
-    }
-
-    @Transactional
-    public void stopSlaTimer(String ticketId) {
-        log.debug("Stopping SLA timer for ticket: {}", ticketId);
-    }
-
-    @Transactional
-    public void checkAndCreateBreaches(String tenantId) {
-        List<SlaBreach> unacknowledged = slaBreachRepository.findUnacknowledgedUnescalated(tenantId);
-        Instant now = Instant.now();
-
-        for (SlaBreach breach : unacknowledged) {
-            if (breach.getBreachTime().isBefore(now)) {
-                if (!breach.isEscalated()) {
-                    breach.setEscalated(true);
-                    breach.setEscalatedAt(now);
-                    slaBreachRepository.save(breach);
-                }
-            }
-        }
+        return total;
     }
 }

@@ -40,4 +40,10 @@ public interface SlaBreachRepository extends JpaRepository<SlaBreach, String> {
     List<SlaBreach> findAllPendingEscalation(@Param("now") Instant now);
 
     long countByTenantIdAndResolvedFalse(String tenantId);
+
+    List<SlaBreach> findByTenantIdAndResolvedFalse(String tenantId);
+
+    List<SlaBreach> findByTicketIdAndResolvedFalse(String ticketId);
+
+    boolean existsByTicketIdAndBreachTypeAndBreachTime(String ticketId, SlaBreach.BreachType breachType, Instant breachTime);
 }

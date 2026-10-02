@@ -18,7 +18,7 @@ public class CreateSlaDefinitionRequest {
     @Size(max = 1000)
     private String description;
 
-    @NotNull
+    /** Ignorado: a definição sempre pertence ao tenant do chamador. */
     private String tenantId;
 
     private boolean active = true;

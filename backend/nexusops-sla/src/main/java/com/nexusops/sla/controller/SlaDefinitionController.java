@@ -7,9 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,10 +24,11 @@ public class SlaDefinitionController {
 
     @PostMapping
     @PreAuthorize("hasPermission('SLA', 'CREATE')")
-    @Operation(summary = "Create a new SLA definition")
+    @Operation(summary = "Create a new SLA definition in the caller's tenant")
     public ResponseEntity<SlaDefinitionDto> createDefinition(@Valid @RequestBody CreateSlaDefinitionRequest request) {
         String createdBy = securityUtils.getCurrentUserId().orElseThrow();
-        return ResponseEntity.ok(slaDefinitionService.createDefinition(request, createdBy));
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return ResponseEntity.ok(slaDefinitionService.createDefinition(request, createdBy, tenantId));
     }
 
     @GetMapping
@@ -50,26 +48,29 @@ public class SlaDefinitionController {
     @PreAuthorize("hasPermission('SLA', 'READ')")
     @Operation(summary = "Get SLA definition by ID")
     public ResponseEntity<SlaDefinitionDto> getDefinition(@PathVariable String id) {
-        return slaDefinitionService.findById(id)
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return slaDefinitionService.findById(id, tenantId)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasPermission('SLA', 'UPDATE')")
-    @Operation(summary = "Update SLA definition")
+    @Operation(summary = "Update SLA definition (null keeps a value, blank clears a criterion)")
     public ResponseEntity<SlaDefinitionDto> updateDefinition(
             @PathVariable String id,
             @Valid @RequestBody UpdateSlaDefinitionRequest request) {
         String updatedBy = securityUtils.getCurrentUserId().orElseThrow();
-        return ResponseEntity.ok(slaDefinitionService.updateDefinition(id, request, updatedBy));
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return ResponseEntity.ok(slaDefinitionService.updateDefinition(id, tenantId, request, updatedBy));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasPermission('SLA', 'DELETE')")
     @Operation(summary = "Delete SLA definition")
     public ResponseEntity<Void> deleteDefinition(@PathVariable String id) {
-        slaDefinitionService.deleteDefinition(id);
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        slaDefinitionService.deleteDefinition(id, tenantId);
         return ResponseEntity.ok().build();
     }
 }

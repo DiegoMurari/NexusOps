@@ -1,5 +1,6 @@
 package com.nexusops.sla.dto;
 
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -29,8 +30,10 @@ public class UpdateSlaDefinitionRequest {
     @Size(max = 50)
     private String appliesToCustomerTier;
 
+    @Positive
     private Integer responseTimeMinutes;
 
+    @Positive
     private Integer resolutionTimeMinutes;
 
     private String businessCalendarId;

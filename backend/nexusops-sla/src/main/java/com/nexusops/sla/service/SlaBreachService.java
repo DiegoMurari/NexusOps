@@ -36,11 +36,45 @@ public class SlaBreachService {
         return slaBreachRepository.findByTenantId(tenantId, pageable).map(slaBreachMapper::toDto);
     }
 
+    /**
+     * Violações ainda abertas: não resolvidas. Reconhecer ou escalar não tira a violação da lista; só a
+     * resolução do chamado (ou resolver a violação) tira.
+     */
     @Transactional(readOnly = true)
     public List<SlaBreachDto> findActiveBreaches(String tenantId) {
-        return slaBreachRepository.findByTenantIdAndAcknowledgedAndEscalatedAndResolved(tenantId, false, false, false).stream()
+        return slaBreachRepository.findByTenantIdAndResolvedFalse(tenantId).stream()
             .map(slaBreachMapper::toDto)
             .toList();
+    }
+
+    /**
+     * Registra uma violação uma única vez por chamado, tipo e prazo estourado (o prazo identifica o ciclo).
+     * Devolve verdadeiro quando criou, falso quando já existia.
+     */
+    public boolean recordBreach(String ticketId, String slaDefinitionId, String tenantId,
+                                SlaBreach.BreachType type, Instant dueAt, Integer percentage) {
+        if (slaBreachRepository.existsByTicketIdAndBreachTypeAndBreachTime(ticketId, type, dueAt)) {
+            return false;
+        }
+        slaBreachRepository.save(SlaBreach.builder()
+            .ticketId(ticketId)
+            .slaDefinitionId(slaDefinitionId)
+            .tenantId(tenantId)
+            .breachType(type)
+            .breachTime(dueAt)
+            .breachPercentage(percentage)
+            .build());
+        return true;
+    }
+
+    /** O chamado foi resolvido: as violações dele deixam de estar ativas (o histórico permanece). */
+    public void resolveByTicket(String ticketId) {
+        Instant now = Instant.now();
+        for (SlaBreach breach : slaBreachRepository.findByTicketIdAndResolvedFalse(ticketId)) {
+            breach.setResolved(true);
+            breach.setResolvedAt(now);
+            slaBreachRepository.save(breach);
+        }
     }
 
     @Transactional(readOnly = true)
