@@ -14,8 +14,9 @@ import { IntegrationActivityComponent } from '../integration-activity/integratio
     <nx-page-header heading="Integrações" />
 
     <nx-notice tone="info">
-      O teste de envio dos webhooks e a verificação de alcance das conexões funcionam e ficam registrados abaixo.
-      O envio automático dos eventos do NexusOps e a sincronização com Jira e Slack ainda não estão disponíveis.
+      Os webhooks recebem automaticamente os eventos de chamados que assinam, com nova tentativa em caso de falha.
+      O teste de envio e a verificação de alcance das conexões ficam registrados abaixo.
+      A sincronização com Jira e Slack ainda não está disponível.
     </nx-notice>
 
     @if (error()) {
@@ -30,7 +31,13 @@ import { IntegrationActivityComponent } from '../integration-activity/integratio
           <p class="card-text">Endpoints HTTPS que receberão eventos do NexusOps.</p>
           <span class="count">{{ overview()?.webhooks ?? '—' }} cadastrados · {{ overview()?.activeWebhooks ?? '—' }} ativos</span>
           @if (overview()?.failingWebhooks) {
-            <span class="alert">{{ overview()!.failingWebhooks }} com falha no último teste</span>
+            <span class="alert">{{ overview()!.failingWebhooks }} com falha no último envio</span>
+          }
+          @if (overview()?.failedDeliveries) {
+            <span class="alert">{{ overview()!.failedDeliveries }} entregas desistiram — reenvie em Webhooks</span>
+          }
+          @if (overview()?.pendingDeliveries) {
+            <span class="count">{{ overview()!.pendingDeliveries }} na fila de envio</span>
           }
         </div>
       </a>

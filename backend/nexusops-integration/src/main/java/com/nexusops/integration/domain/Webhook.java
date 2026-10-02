@@ -1,5 +1,6 @@
 package com.nexusops.integration.domain;
 
+import com.nexusops.integration.crypto.WebhookSecretConverter;
 import com.nexusops.shared.tenancy.TenantAware;
 import jakarta.persistence.*;
 import lombok.*;
@@ -34,7 +35,8 @@ public class Webhook implements TenantAware {
     private String targetUrl;
 
     /** Signing secret. Write-only: never returned by the API. */
-    @Column(name = "secret", length = 255)
+    @Convert(converter = WebhookSecretConverter.class)
+    @Column(name = "secret", length = 512)
     private String secret;
 
     @Column(name = "tenant_id", nullable = false, length = 36)

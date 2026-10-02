@@ -1,7 +1,12 @@
 package com.nexusops.integration.controller;
 
 import com.nexusops.integration.domain.Connector;
+import com.nexusops.integration.delivery.WebhookEvents;
 import com.nexusops.integration.domain.IntegrationLog;
+import com.nexusops.integration.domain.WebhookDelivery;
+import com.nexusops.integration.dto.WebhookDeliveryDto;
+import com.nexusops.integration.dto.WebhookEventDto;
+import com.nexusops.integration.service.WebhookDeliveryService;
 import com.nexusops.integration.dto.ConnectorDto;
 import com.nexusops.integration.dto.CreateConnectorRequest;
 import com.nexusops.integration.dto.CreateWebhookRequest;
@@ -35,6 +40,7 @@ public class IntegrationController {
     private final WebhookService webhookService;
     private final ConnectorService connectorService;
     private final IntegrationLogService logService;
+    private final WebhookDeliveryService deliveryService;
     private final SecurityUtils securityUtils;
 
     @GetMapping("/overview")
@@ -47,6 +53,9 @@ public class IntegrationController {
             .webhooks(webhookService.count(tenant))
             .activeWebhooks(webhookService.countActive(tenant))
             .failingWebhooks(webhookService.countFailing(tenant))
+            .pendingDeliveries(deliveryService.count(tenant, WebhookDelivery.Status.PENDING)
+                + deliveryService.count(tenant, WebhookDelivery.Status.SENDING))
+            .failedDeliveries(deliveryService.count(tenant, WebhookDelivery.Status.FAILED))
             .connectors(byType.values().stream().mapToLong(Long::longValue).sum())
             .disabledConnectors(connectorService.countDisabled(tenant))
             .failingConnectors(connectorService.countFailing(tenant))
@@ -65,6 +74,31 @@ public class IntegrationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(logService.list(tenant(), kind, integrationId, outcome, page, size));
+    }
+
+    @GetMapping("/events")
+    @PreAuthorize("hasPermission('INTEGRATION', 'READ')")
+    @Operation(summary = "Events a webhook can subscribe to")
+    public ResponseEntity<List<WebhookEventDto>> events() {
+        return ResponseEntity.ok(WebhookEvents.catalog());
+    }
+
+    @GetMapping("/deliveries")
+    @PreAuthorize("hasPermission('INTEGRATION', 'READ')")
+    @Operation(summary = "Automatic event deliveries, newest first")
+    public ResponseEntity<Page<WebhookDeliveryDto>> deliveries(
+            @RequestParam(required = false) String webhookId,
+            @RequestParam(required = false) WebhookDelivery.Status status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(deliveryService.list(tenant(), webhookId, status, page, size));
+    }
+
+    @PostMapping("/deliveries/{id}/retry")
+    @PreAuthorize("hasPermission('INTEGRATION', 'UPDATE')")
+    @Operation(summary = "Put a failed delivery back in the queue")
+    public ResponseEntity<WebhookDeliveryDto> retryDelivery(@PathVariable String id) {
+        return ResponseEntity.ok(deliveryService.retry(id, tenant()));
     }
 
     @PostMapping("/webhooks")

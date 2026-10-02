@@ -2,18 +2,21 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { IntegrationService, WebhookDto, describeResult } from '../../../core/integrations/integration.service';
+import {
+  IntegrationService, WebhookDto, WebhookEventInfo, describeResult,
+} from '../../../core/integrations/integration.service';
 import {
   ButtonComponent, DataTableComponent, EmptyStateComponent, NoticeComponent, NxCellDirective, NxColumn,
   PageHeaderComponent, StatusBadgeComponent,
 } from '../../../shared/components';
+import { WebhookDeliveriesComponent } from '../webhook-deliveries/webhook-deliveries.component';
 
 @Component({
   selector: 'app-webhook-config',
   standalone: true,
   imports: [
     CommonModule, RouterLink, MatIconModule, ButtonComponent, DataTableComponent, EmptyStateComponent,
-    NoticeComponent, NxCellDirective, PageHeaderComponent, StatusBadgeComponent,
+    NoticeComponent, NxCellDirective, PageHeaderComponent, StatusBadgeComponent, WebhookDeliveriesComponent,
   ],
   template: `
     <nx-page-header heading="Webhooks">
@@ -24,7 +27,7 @@ import {
       </button>
     </nx-page-header>
 
-    <nx-notice tone="info">Use “Enviar teste” para mandar um evento assinado ao endereço e ver se ele responde. O envio automático dos eventos do NexusOps ainda não está disponível. Somente URLs https públicas são aceitas.</nx-notice>
+    <nx-notice tone="info">Use “Enviar teste” para mandar um evento assinado ao endereço e ver se ele responde. Os eventos assinados são enviados automaticamente, com nova tentativa em caso de falha; o corpo traz só identificadores e metadados do chamado, nunca o texto de comentários ou da solução. Somente URLs https públicas são aceitas.</nx-notice>
 
     @if (testResult(); as t) {
       <nx-notice [tone]="t.ok ? 'success' : 'critical'">{{ t.text }}</nx-notice>
@@ -46,6 +49,14 @@ import {
             <span class="label">Eventos (separados por vírgula)</span>
             <input class="input mono" type="text" placeholder="ticket.created, ticket.closed"
                    [value]="events()" (input)="events.set($any($event.target).value)" />
+            @if (catalog().length) {
+              <span class="picker" role="group" aria-label="Eventos disponíveis">
+                @for (e of catalog(); track e.name) {
+                  <button nxButton size="sm" type="button" [variant]="isSelected(e.name) ? 'primary' : 'secondary'"
+                          [attr.aria-pressed]="isSelected(e.name)" [title]="e.description" (click)="toggleEvent(e.name)">{{ e.name }}</button>
+                }
+              </span>
+            }
           </label>
           <label class="field">
             <span class="label">Segredo de assinatura {{ editingId() ? '(vazio mantém o atual)' : '' }}</span>
@@ -77,7 +88,7 @@ import {
             <nx-status-badge [tone]="w.lastDeliveryStatus === 'SUCCESS' ? 'success' : 'critical'">{{ w.lastDeliveryStatus === 'SUCCESS' ? 'Entregue' : 'Falhou' }}</nx-status-badge>
             <span class="when">{{ w.lastDeliveryAt | date:'dd/MM HH:mm' }}{{ deliveryDetail(w) }}</span>
           } @else {
-            <span class="when">Nunca testado</span>
+            <span class="when">Sem envios</span>
           }
         </ng-template>
         <ng-template nxCell="actions" let-w>
@@ -98,9 +109,14 @@ import {
         </ng-template>
       </nx-data-table>
     }
+
+    @if (!loading() && !error()) {
+      <app-webhook-deliveries [webhooks]="items()" />
+    }
   `,
   styles: [`
     :host { display: block; }
+    .picker { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-3); }
     .form-card { padding: var(--sp-7); margin-bottom: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-6); }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-6); }
     .inline-error { margin: 0; }
@@ -114,11 +130,12 @@ export class WebhookConfigComponent implements OnInit {
     { key: 'events', header: 'Eventos', muted: true },
     { key: 'hasSecret', header: 'Assinado', muted: true },
     { key: 'status', header: 'Status' },
-    { key: 'lastDelivery', header: 'Último teste' },
+    { key: 'lastDelivery', header: 'Último envio' },
     { key: 'actions', header: 'Ações', align: 'end', hideHeader: true },
   ];
 
   items = signal<WebhookDto[]>([]);
+  catalog = signal<WebhookEventInfo[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
   actionError = signal<string | null>(null);
@@ -138,6 +155,21 @@ export class WebhookConfigComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // O catálogo é só conveniência: sem ele o campo de texto continua funcionando.
+    this.integrationService.events().subscribe({ next: list => this.catalog.set(list), error: () => undefined });
+  }
+
+  private selectedEvents(): string[] {
+    return this.events().split(',').map(e => e.trim()).filter(Boolean);
+  }
+
+  isSelected(name: string): boolean {
+    return this.selectedEvents().includes(name);
+  }
+
+  toggleEvent(name: string): void {
+    const current = this.selectedEvents();
+    this.events.set((current.includes(name) ? current.filter(e => e !== name) : [...current, name]).join(', '));
   }
 
   openForm(): void {

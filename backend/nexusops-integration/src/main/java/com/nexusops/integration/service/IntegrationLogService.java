@@ -74,6 +74,11 @@ public class IntegrationLogService {
         return logRepository.findAll(spec, pageable).map(IntegrationLogMapper::toDto);
     }
 
+    /** Retenção do histórico: apaga o que for mais antigo que {@code before}. */
+    public int purgeOlderThan(java.time.Instant before) {
+        return logRepository.deleteOlderThan(before);
+    }
+
     private static String truncate(String message) {
         if (message == null) {
             return null;

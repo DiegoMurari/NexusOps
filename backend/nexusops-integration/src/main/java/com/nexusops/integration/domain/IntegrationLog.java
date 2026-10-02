@@ -84,7 +84,9 @@ public class IntegrationLog implements TenantAware {
         DISABLED,
         DELETED,
         TEST,
-        CHECK
+        CHECK,
+        /** Entrega automática de um evento do sistema. */
+        DELIVERY
     }
 
     public enum Outcome {

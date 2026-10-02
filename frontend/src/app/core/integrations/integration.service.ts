@@ -8,7 +8,38 @@ export type ConnectorStatus = 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'SYNCING'
 export type WebhookStatus = 'ACTIVE' | 'INACTIVE' | 'FAILED' | 'DISABLED';
 export type IntegrationOutcome = 'SUCCESS' | 'FAILURE';
 export type IntegrationKind = 'WEBHOOK' | 'CONNECTOR';
-export type IntegrationEvent = 'CREATED' | 'UPDATED' | 'ENABLED' | 'DISABLED' | 'DELETED' | 'TEST' | 'CHECK';
+export type IntegrationEvent = 'CREATED' | 'UPDATED' | 'ENABLED' | 'DISABLED' | 'DELETED' | 'TEST' | 'CHECK' | 'DELIVERY';
+export type DeliveryStatus = 'PENDING' | 'SENDING' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
+
+export interface WebhookEventInfo {
+  name: string;
+  description: string;
+}
+
+export interface WebhookDeliveryDto {
+  id: string;
+  webhookId: string;
+  eventType: string;
+  status: DeliveryStatus;
+  attempts: number;
+  nextAttemptAt: string;
+  lastHttpStatus: number | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
+export interface WebhookDeliveryPage {
+  content: WebhookDeliveryDto[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
+export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
+  PENDING: 'Na fila', SENDING: 'Enviando', DELIVERED: 'Entregue', FAILED: 'Desistiu', CANCELLED: 'Cancelada',
+};
 
 export interface WebhookDto {
   id: string;
@@ -64,6 +95,8 @@ export interface IntegrationOverview {
   webhooks: number;
   activeWebhooks: number;
   failingWebhooks: number;
+  pendingDeliveries: number;
+  failedDeliveries: number;
   connectors: number;
   disabledConnectors: number;
   failingConnectors: number;
@@ -109,7 +142,7 @@ export interface IntegrationLogFilter {
 
 export const EVENT_LABELS: Record<IntegrationEvent, string> = {
   CREATED: 'Criado', UPDATED: 'Alterado', ENABLED: 'Ativado', DISABLED: 'Desativado',
-  DELETED: 'Excluído', TEST: 'Teste de envio', CHECK: 'Verificação',
+  DELETED: 'Excluído', TEST: 'Teste de envio', CHECK: 'Verificação', DELIVERY: 'Entrega de evento',
 };
 
 /** Categorias de falha devolvidas pela API, em linguagem de gente. */
@@ -119,10 +152,13 @@ export const FAILURE_LABELS: Record<string, string> = {
   IO_ERROR: 'Erro de comunicação', INTERRUPTED: 'Interrompido',
 };
 
-/** "HTTP 503" e as categorias acima viram texto legível; qualquer outra coisa passa como veio. */
+/**
+ * "HTTP 503" e as categorias acima viram texto legível; qualquer outra coisa passa como veio. Mensagens
+ * compostas ("ticket.created · tentativa 2 · TIMEOUT") são traduzidas por trecho.
+ */
 export function describeResult(message: string | null | undefined): string {
   if (!message) return '—';
-  return FAILURE_LABELS[message] ?? message;
+  return message.split(' · ').map(part => FAILURE_LABELS[part] ?? part.replace(/^HTTP_(\d{3})$/, 'HTTP $1')).join(' · ');
 }
 
 @Injectable({ providedIn: 'root' })
@@ -140,6 +176,21 @@ export class IntegrationService {
     if (filter.outcome) params = params.set('outcome', filter.outcome);
     if (filter.integrationId) params = params.set('integrationId', filter.integrationId);
     return this.http.get<IntegrationLogPage>(`${this.base}/logs`, { params });
+  }
+
+  events(): Observable<WebhookEventInfo[]> {
+    return this.http.get<WebhookEventInfo[]>(`${this.base}/events`);
+  }
+
+  listDeliveries(page: number, size: number, filter: { webhookId?: string; status?: DeliveryStatus } = {}): Observable<WebhookDeliveryPage> {
+    let params = new HttpParams().set('page', page).set('size', size);
+    if (filter.webhookId) params = params.set('webhookId', filter.webhookId);
+    if (filter.status) params = params.set('status', filter.status);
+    return this.http.get<WebhookDeliveryPage>(`${this.base}/deliveries`, { params });
+  }
+
+  retryDelivery(id: string): Observable<WebhookDeliveryDto> {
+    return this.http.post<WebhookDeliveryDto>(`${this.base}/deliveries/${id}/retry`, {});
   }
 
   listWebhooks(): Observable<WebhookDto[]> {

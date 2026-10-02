@@ -14,6 +14,10 @@ public class IntegrationOverviewDto {
     private long activeWebhooks;
     /** Webhooks cuja última entrega falhou. */
     private long failingWebhooks;
+    /** Entregas de eventos esperando envio ou reenvio. */
+    private long pendingDeliveries;
+    /** Entregas que desistiram depois de todas as tentativas e esperam reenvio manual. */
+    private long failedDeliveries;
     private long connectors;
     private long disabledConnectors;
     /** Conectores cuja última verificação de alcance falhou. */
