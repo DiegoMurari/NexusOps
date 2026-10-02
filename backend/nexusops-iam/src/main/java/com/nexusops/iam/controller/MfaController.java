@@ -6,6 +6,7 @@ import com.nexusops.iam.dto.MfaDisableRequest;
 import com.nexusops.iam.service.MfaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import com.nexusops.shared.security.SecurityUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,30 +19,33 @@ public class MfaController {
 
     @PostMapping("/setup")
     public ResponseEntity<MfaSetupResponse> setupMfa() {
-        // Get current user from security context
-        // For now, assuming username is passed
-        return ResponseEntity.ok(mfaService.setupMfa("current-user"));
+        return ResponseEntity.ok(mfaService.setupMfa(currentUser()));
     }
 
     @PostMapping("/enable")
     public ResponseEntity<Void> enableMfa(@Valid @RequestBody MfaEnableRequest request) {
-        mfaService.enableMfa("current-user", request.getCode());
+        mfaService.enableMfa(currentUser(), request.getCode());
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/disable")
     public ResponseEntity<Void> disableMfa(@Valid @RequestBody MfaDisableRequest request) {
-        mfaService.disableMfa("current-user", request.getPassword());
+        mfaService.disableMfa(currentUser(), request.getPassword());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/recovery-codes")
     public ResponseEntity<java.util.List<String>> getRecoveryCodes() {
-        return ResponseEntity.ok(mfaService.getRecoveryCodes("current-user"));
+        return ResponseEntity.ok(mfaService.getRecoveryCodes(currentUser()));
     }
 
     @PostMapping("/recovery-codes/regenerate")
     public ResponseEntity<java.util.List<String>> regenerateRecoveryCodes() {
-        return ResponseEntity.ok(mfaService.regenerateRecoveryCodes("current-user"));
+        return ResponseEntity.ok(mfaService.regenerateRecoveryCodes(currentUser()));
+    }
+
+    /** O principal é o e-mail do usuário autenticado; sem ele a rota nem chega aqui (exige login). */
+    private static String currentUser() {
+        return SecurityUtils.getCurrentUserId().orElseThrow();
     }
 }

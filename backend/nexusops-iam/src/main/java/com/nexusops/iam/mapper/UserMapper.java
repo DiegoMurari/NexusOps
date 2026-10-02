@@ -9,8 +9,13 @@ import org.mapstruct.*;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserMapper {
 
+    /** A localidade padrão é validada e aplicada pelo UserService, não copiada às cegas. */
+    @Mapping(target = "defaultLocationId", ignore = true)
     User toEntity(CreateUserRequest request);
 
+    /** PATCH: campo nulo no pedido mantém o valor atual (não apaga). */
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "defaultLocationId", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
     @Mapping(target = "roles", ignore = true)
     @Mapping(target = "permissions", ignore = true)

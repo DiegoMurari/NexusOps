@@ -51,11 +51,10 @@ public class MfaService {
         
         mfaSecret.setSecret(secret);
         mfaSecret.setEnabled(false);
-        mfaSecret.setBackupCodes(null);
-        mfaSecretRepository.save(mfaSecret);
-
-        // Generate recovery codes
+        // Os códigos de recuperação mostrados agora são os mesmos que ficam gravados (só o hash).
         List<String> recoveryCodes = generateRecoveryCodes(10);
+        mfaSecret.setBackupCodes(hashRecoveryCodes(recoveryCodes));
+        mfaSecretRepository.save(mfaSecret);
 
         return MfaSetupResponse.builder()
             .secret(secret)
@@ -79,12 +78,7 @@ public class MfaService {
             throw new ValidationException("Invalid MFA code");
         }
 
-        // Generate and store backup codes
-        List<String> recoveryCodes = generateRecoveryCodes(10);
-        String hashedCodes = hashRecoveryCodes(recoveryCodes);
-
         mfaSecret.setEnabled(true);
-        mfaSecret.setBackupCodes(hashedCodes);
         mfaSecretRepository.save(mfaSecret);
 
         user.setMfaEnabled(true);
@@ -210,6 +204,7 @@ public class MfaService {
                     throw new RuntimeException("Failed to hash recovery code", e);
                 }
             })
-            .collect(Collectors.joining(","));
+            .map(h -> "\"" + h + "\"") // base64 não tem aspas nem barra invertida: seguro como string JSON
+            .collect(Collectors.joining(",", "[", "]")); // a coluna é jsonb: precisa ser um array JSON válido
     }
 }

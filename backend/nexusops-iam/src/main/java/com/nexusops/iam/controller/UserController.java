@@ -1,6 +1,7 @@
 package com.nexusops.iam.controller;
 
 import com.nexusops.iam.dto.CreateUserRequest;
+import com.nexusops.iam.dto.UpdateProfileRequest;
 import com.nexusops.iam.dto.UpdateUserRequest;
 import com.nexusops.iam.dto.UserResponse;
 import com.nexusops.iam.security.CallerPermissions;
@@ -25,7 +26,20 @@ public class UserController {
     @PostMapping
     @PreAuthorize("hasPermission('USER', 'CREATE')")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
-        return ResponseEntity.ok(userService.createUser(request, actor(), tenant(), CallerPermissions.current()));
+        return ResponseEntity.ok(userService.createUser(
+            request, actor(), tenant(), CallerPermissions.current(), CallerPermissions.currentRoles()));
+    }
+
+    /** The caller's own profile. Authenticated only: requesters hold no USER permission. */
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> me() {
+        return ResponseEntity.ok(userService.getProfile(actor(), tenant()));
+    }
+
+    /** Self-service profile edit (names, contact, job data, default location). Never roles or status. */
+    @PatchMapping("/me")
+    public ResponseEntity<UserResponse> updateMe(@Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(userService.updateProfile(actor(), request, tenant()));
     }
 
     @GetMapping("/{id}")
@@ -44,13 +58,14 @@ public class UserController {
     @PatchMapping("/{id}")
     @PreAuthorize("hasPermission('USER', 'UPDATE')")
     public ResponseEntity<UserResponse> updateUser(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(userService.updateUser(id, request, actor(), tenant()));
+        return ResponseEntity.ok(userService.updateUser(
+            id, request, actor(), tenant(), CallerPermissions.current(), CallerPermissions.currentRoles()));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasPermission('USER', 'DELETE')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
-        userService.deleteUser(id, tenant());
+        userService.deleteUser(id, tenant(), actor(), CallerPermissions.currentRoles());
         return ResponseEntity.noContent().build();
     }
 

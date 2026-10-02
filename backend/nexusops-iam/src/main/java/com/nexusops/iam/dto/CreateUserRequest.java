@@ -27,6 +27,19 @@ public class CreateUserRequest {
     @Size(max = 100)
     private String lastName;
 
+    @Size(max = 50)
+    private String phone;
+
+    @Size(max = 100)
+    private String jobTitle;
+
+    @Size(max = 100)
+    private String department;
+
+    /** Localidade padrão; precisa existir e estar ativa no tenant do chamador. */
+    @Size(max = 36)
+    private String defaultLocationId;
+
     /** Ignored: the new user always belongs to the caller's tenant. */
     private String tenantId;
 

@@ -17,6 +17,10 @@ public class UserResponse {
     private String email;
     private String firstName;
     private String lastName;
+    private String phone;
+    private String jobTitle;
+    private String department;
+    private String defaultLocationId;
     private String status;
     private String tenantId;
     private Set<String> roles;

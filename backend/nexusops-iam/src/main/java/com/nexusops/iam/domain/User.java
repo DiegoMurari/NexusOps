@@ -40,6 +40,19 @@ public class User implements TenantAware {
     @Column(name = "last_name", length = 100)
     private String lastName;
 
+    @Column(name = "phone", length = 50)
+    private String phone;
+
+    @Column(name = "job_title", length = 100)
+    private String jobTitle;
+
+    @Column(name = "department", length = 100)
+    private String department;
+
+    /** Localidade padrão (ID em asset.locations). Alimenta o roteamento e o pré-preenchimento do chamado. */
+    @Column(name = "default_location_id", length = 36)
+    private String defaultLocationId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default

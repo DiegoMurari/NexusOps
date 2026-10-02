@@ -2,7 +2,6 @@ package com.nexusops.iam.controller;
 
 import com.nexusops.iam.dto.AuthRequest;
 import com.nexusops.iam.dto.AuthResponse;
-import com.nexusops.iam.dto.MfaVerifyRequest;
 import com.nexusops.iam.dto.RefreshTokenRequest;
 import com.nexusops.iam.service.AuthService;
 import jakarta.validation.Valid;
@@ -20,11 +19,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.login(request));
-    }
-
-    @PostMapping("/mfa/verify")
-    public ResponseEntity<AuthResponse> verifyMfa(@Valid @RequestBody MfaVerifyRequest request) {
-        return ResponseEntity.ok(authService.verifyMfa(request));
     }
 
     @PostMapping("/refresh")

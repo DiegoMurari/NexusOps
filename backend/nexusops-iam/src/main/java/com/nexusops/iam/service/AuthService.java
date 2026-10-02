@@ -5,7 +5,6 @@ import com.nexusops.iam.domain.Role;
 import com.nexusops.iam.domain.User;
 import com.nexusops.iam.dto.AuthRequest;
 import com.nexusops.iam.dto.AuthResponse;
-import com.nexusops.iam.dto.MfaVerifyRequest;
 import com.nexusops.iam.dto.RefreshTokenRequest;
 import com.nexusops.iam.event.LoginAttemptedEvent;
 import com.nexusops.iam.infrastructure.repository.RefreshTokenRepository;
@@ -81,11 +80,6 @@ public class AuthService {
 
     private void publishLogin(User user, boolean success, String reason) {
         eventPublisher.publishEvent(new LoginAttemptedEvent(user.getTenantId(), user.getEmail(), success, reason));
-    }
-
-    public AuthResponse verifyMfa(MfaVerifyRequest request) {
-        // This would be used for MFA challenge flow
-        throw new UnsupportedOperationException("Use login with mfaCode");
     }
 
     public AuthResponse refreshToken(RefreshTokenRequest request) {
