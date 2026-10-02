@@ -47,12 +47,12 @@ The captures below use demo data (fictional people, queues and tickets).
 | **Frontend** | Angular 17+, TypeScript, Angular Material 3, RxJS 7, Signals |
 | **Backend** | Java 21, Spring Boot 3.2+, Spring Modulith, Spring Security, Spring Data JPA |
 | **Database** | PostgreSQL 16, Redis 7, Flyway |
-| **Auth** | JWT RS256, Embedded Spring Authorization Server (OAuth 2.1/OIDC), MFA TOTP |
-| **API** | REST (OpenAPI 3.1), WebSocket (STOMP), SSE |
-| **Infrastructure** | Docker, Kubernetes (Kustomize), ArgoCD, Terraform, AWS (EKS, RDS, ElastiCache) |
+| **Auth** | JWT HS256 (access + refresh, key via `JWT_PRIVATE_KEY`), MFA TOTP, role and permission based access |
+| **API** | REST with RFC 7807 errors, OpenAPI (springdoc) |
+| **Infrastructure** | Docker; Kubernetes (Kustomize/ArgoCD) and Terraform (AWS) manifests, not yet validated against a live cluster |
 | **CI/CD** | GitHub Actions, Trivy, CodeQL, Cosign, Dependabot |
-| **Observability** | OpenTelemetry, Prometheus, Grafana, Loki, Tempo, Pyroscope |
-| **Testing** | JUnit 5, Mockito, Testcontainers, Spring Cloud Contract, Playwright, k6 |
+| **Observability** | Planned: OpenTelemetry, Prometheus, Grafana |
+| **Testing** | JUnit 5, Mockito, ArchUnit, Testcontainers; Playwright scripts for UI checks; k6 scenarios in `tests/performance` |
 
 ## Architecture
 
@@ -60,7 +60,7 @@ The captures below use demo data (fictional people, queues and tickets).
 - **Modules**: 10 bounded contexts (IAM, Ticketing, Asset, Knowledge, SLA, Notification, Reporting, Integration, Platform, Shared Kernel)
 - **Communication**: Domain events (TransactionalEventPublisher) for cross-module async
 - **Multi-tenancy**: Logical schemas + Hibernate Filters + TenantContext from JWT
-- **Real-time**: WebSocket (STOMP) primary + SSE fallback
+- **Real-time**: planned (WebSocket/SSE); screens currently refresh by polling and on navigation
 
 ## Quick Start
 
