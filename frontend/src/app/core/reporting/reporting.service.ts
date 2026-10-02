@@ -9,7 +9,8 @@ export type ReportType =
   | 'SLA_COMPLIANCE'
   | 'AGENT_PERFORMANCE'
   | 'CATEGORY_DISTRIBUTION'
-  | 'TREND_ANALYSIS';
+  | 'TREND_ANALYSIS'
+  | 'BACKLOG';
 
 export type ExportFormat = 'PDF' | 'EXCEL' | 'CSV';
 
@@ -73,6 +74,7 @@ export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   AGENT_PERFORMANCE: 'Desempenho por agente',
   CATEGORY_DISTRIBUTION: 'Distribuição por categoria',
   TREND_ANALYSIS: 'Análise de tendência',
+  BACKLOG: 'Backlog por idade',
 };
 
 @Injectable({ providedIn: 'root' })
@@ -95,6 +97,13 @@ export class ReportingService {
 
   overview(days: number): Observable<ReportResultDto> {
     return this.http.get<ReportResultDto>(`${this.reportsBase}/overview`, { params: new HttpParams().set('days', days) });
+  }
+
+  /** Análise nativa direta, sem relatório salvo (painel analítico). */
+  builtin(type: ReportType, days: number): Observable<ReportResultDto> {
+    return this.http.get<ReportResultDto>(`${this.reportsBase}/builtin`, {
+      params: new HttpParams().set('type', type).set('days', days),
+    });
   }
 
   runReport(id: string, days: number): Observable<ReportResultDto> {

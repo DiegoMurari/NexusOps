@@ -15,3 +15,5 @@ export * from './context-chain/context-chain.component';
 export * from './action-icon/action-icon.component';
 export * from './dynamic-form/dynamic-form.component';
 export * from './theme-toggle/theme-toggle.component';
+export * from './bar-list/bar-list.component';
+export * from './trend-chart/trend-chart.component';

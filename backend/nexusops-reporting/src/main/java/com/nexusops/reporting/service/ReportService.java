@@ -68,6 +68,12 @@ public class ReportService {
         return dataService.run(report.getReportType(), tenantId, days);
     }
 
+    /** Roda uma análise nativa direto, sem precisar de um relatório salvo (painel analítico). */
+    @Transactional(readOnly = true)
+    public ReportResultDto runBuiltin(Report.ReportType type, String tenantId, int days) {
+        return dataService.run(type, tenantId, days);
+    }
+
     @Transactional(readOnly = true)
     public ReportResultDto overview(String tenantId, int days) {
         return dataService.run(Report.ReportType.TICKET_SUMMARY, tenantId, days);

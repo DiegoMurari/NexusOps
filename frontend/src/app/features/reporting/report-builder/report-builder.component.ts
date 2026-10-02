@@ -11,6 +11,7 @@ const TYPE_DESCRIPTIONS: Record<ReportType, string> = {
   AGENT_PERFORMANCE: 'Tickets atribuídos e resolvidos por agente.',
   CATEGORY_DISTRIBUTION: 'Distribuição dos tickets por categoria.',
   TREND_ANALYSIS: 'Tickets criados e resolvidos por dia.',
+  BACKLOG: 'Tickets ainda sem resolução por faixa de idade, com vencidos e sem responsável.',
 };
 
 @Component({

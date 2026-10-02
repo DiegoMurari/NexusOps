@@ -1,9 +1,8 @@
 package com.nexusops.reporting.service;
 
-import com.nexusops.iam.domain.User;
-import com.nexusops.iam.infrastructure.repository.UserRepository;
 import com.nexusops.reporting.domain.Report;
 import com.nexusops.reporting.dto.ReportResultDto;
+import com.nexusops.shared.directory.UserDirectory;
 import com.nexusops.shared.exception.ValidationException;
 import com.nexusops.ticketing.domain.Category;
 import com.nexusops.ticketing.domain.Ticket;
@@ -34,7 +33,7 @@ public class ReportDataService {
 
     private final TicketRepository ticketRepository;
     private final CategoryRepository categoryRepository;
-    private final UserRepository userRepository;
+    private final UserDirectory userDirectory;
 
     public ReportResultDto run(Report.ReportType type, String tenantId, int days) {
         if (days < 1 || days > MAX_DAYS) {
@@ -42,14 +41,18 @@ public class ReportDataService {
         }
         Instant to = Instant.now();
         Instant from = to.minus(days, ChronoUnit.DAYS);
-        List<Ticket> tickets = ticketRepository.findByTenantIdAndCreatedAtBetween(tenantId, from, to);
+        // O backlog olha os tickets ainda abertos hoje, qualquer que seja a data de criação.
+        List<Ticket> tickets = type == Report.ReportType.BACKLOG
+            ? List.of()
+            : ticketRepository.findByTenantIdAndCreatedAtBetween(tenantId, from, to);
 
         ReportResultDto result = switch (type) {
             case TICKET_SUMMARY -> ticketSummary(tickets);
             case CATEGORY_DISTRIBUTION -> categoryDistribution(tickets, tenantId);
             case SLA_COMPLIANCE -> slaCompliance(tickets, to);
-            case AGENT_PERFORMANCE -> agentPerformance(tickets);
-            case TREND_ANALYSIS -> trend(tickets);
+            case AGENT_PERFORMANCE -> agentPerformance(tickets, tenantId);
+            case TREND_ANALYSIS -> trend(tickets, from, to);
+            case BACKLOG -> backlog(tenantId, to);
             case CUSTOM -> throw new ValidationException("Custom reports have no built-in executor");
         };
         result.setReportType(type.name());
@@ -62,7 +65,7 @@ public class ReportDataService {
     private ReportResultDto ticketSummary(List<Ticket> tickets) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("total", tickets.size());
-        summary.put("open", tickets.stream().filter(Ticket::isOpen).count());
+        summary.put("open", tickets.stream().filter(ReportDataService::unresolved).count());
         summary.put("resolved", tickets.stream().filter(t -> t.isResolved() || t.isClosed()).count());
         summary.put("avgResolutionHours", avgResolutionHours(tickets));
 
@@ -131,14 +134,53 @@ public class ReportDataService {
             .columns(List.of("priority", "met", "breached", "pending")).rows(rows).build();
     }
 
-    private ReportResultDto agentPerformance(List<Ticket> tickets) {
+    /** Em aberto = ainda sem resolução (inclui em espera e reabertos, que {@code Ticket.isOpen()} deixa de fora). */
+    private static boolean unresolved(Ticket t) {
+        return t.getStatus() != Ticket.TicketStatus.RESOLVED && t.getStatus() != Ticket.TicketStatus.CLOSED;
+    }
+
+    private static final List<Ticket.TicketStatus> UNRESOLVED_STATUSES = List.of(
+        Ticket.TicketStatus.OPEN, Ticket.TicketStatus.IN_PROGRESS, Ticket.TicketStatus.WAITING,
+        Ticket.TicketStatus.ON_HOLD, Ticket.TicketStatus.REOPENED);
+
+    /** Faixas de idade (em horas) do backlog: rótulo e limite superior exclusivo. */
+    private static final String[] AGE_LABELS = {"Até 1 dia", "1 a 3 dias", "3 a 7 dias", "7 a 30 dias", "Mais de 30 dias"};
+    private static final long[] AGE_LIMIT_HOURS = {24, 72, 168, 720};
+
+    private ReportResultDto backlog(String tenantId, Instant now) {
+        List<Ticket> open = ticketRepository.findByTenantIdAndStatusIn(tenantId, UNRESOLVED_STATUSES);
+        long[] buckets = new long[AGE_LABELS.length];
+        long oldestHours = 0;
+        for (Ticket t : open) {
+            long hours = Math.max(0, Duration.between(t.getCreatedAt(), now).toHours());
+            oldestHours = Math.max(oldestHours, hours);
+            int idx = 0;
+            while (idx < AGE_LIMIT_HOURS.length && hours >= AGE_LIMIT_HOURS[idx]) idx++;
+            buckets[idx]++;
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < AGE_LABELS.length; i++) {
+            rows.add(row("age", AGE_LABELS[i], "count", buckets[i],
+                "percentage", open.isEmpty() ? 0.0 : round(100.0 * buckets[i] / open.size())));
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("open", open.size());
+        summary.put("unassigned", open.stream().filter(t -> t.getAssigneeId() == null).count());
+        summary.put("overdue", open.stream()
+            .filter(t -> t.getResolutionDueAt() != null && t.getResolutionDueAt().isBefore(now)).count());
+        summary.put("oldestDays", oldestHours / 24);
+        return ReportResultDto.builder().summary(summary)
+            .columns(List.of("age", "count", "percentage")).rows(rows).build();
+    }
+
+    private ReportResultDto agentPerformance(List<Ticket> tickets, String tenantId) {
         Map<String, List<Ticket>> byAgent = tickets.stream()
             .filter(t -> t.getAssigneeId() != null)
             .collect(Collectors.groupingBy(Ticket::getAssigneeId));
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map.Entry<String, List<Ticket>> e : byAgent.entrySet()) {
             List<Ticket> list = e.getValue();
-            rows.add(row("agent", agentName(e.getKey()), "assigned", (long) list.size(),
+            rows.add(row("agent", agentName(e.getKey(), tenantId), "assigned", (long) list.size(),
                 "resolved", list.stream().filter(t -> t.isResolved() || t.isClosed()).count(),
                 "avgResolutionHours", avgResolutionHours(list)));
         }
@@ -150,7 +192,7 @@ public class ReportDataService {
             .columns(List.of("agent", "assigned", "resolved", "avgResolutionHours")).rows(rows).build();
     }
 
-    private ReportResultDto trend(List<Ticket> tickets) {
+    private ReportResultDto trend(List<Ticket> tickets, Instant from, Instant to) {
         Map<LocalDate, Long> created = new TreeMap<>();
         Map<LocalDate, Long> resolved = new TreeMap<>();
         for (Ticket t : tickets) {
@@ -159,7 +201,12 @@ public class ReportDataService {
                 resolved.merge(t.getResolvedAt().atZone(ZoneOffset.UTC).toLocalDate(), 1L, Long::sum);
             }
         }
-        TreeSet<LocalDate> days = new TreeSet<>(created.keySet());
+        // Todos os dias do período entram, também os sem movimento; senão o gráfico engana.
+        TreeSet<LocalDate> days = new TreeSet<>();
+        for (LocalDate d = from.atZone(ZoneOffset.UTC).toLocalDate(); !d.isAfter(to.atZone(ZoneOffset.UTC).toLocalDate()); d = d.plusDays(1)) {
+            days.add(d);
+        }
+        days.addAll(created.keySet());
         days.addAll(resolved.keySet());
         List<Map<String, Object>> rows = new ArrayList<>();
         for (LocalDate d : days) {
@@ -173,15 +220,13 @@ public class ReportDataService {
             .columns(List.of("date", "created", "resolved")).rows(rows).build();
     }
 
-    private String agentName(String userId) {
-        try {
-            return userRepository.findById(UUID.fromString(userId))
-                .map((User u) -> (u.getFirstName() + " " + u.getLastName()).trim())
-                .filter(n -> !n.isBlank())
-                .orElse(userId);
-        } catch (IllegalArgumentException e) {
-            return userId;
-        }
+    /** O responsável do ticket é guardado como e-mail (o principal autenticado); mostra o nome quando houver. */
+    private String agentName(String assigneeId, String tenantId) {
+        return userDirectory.findActiveByEmail(assigneeId, tenantId)
+            .or(() -> userDirectory.findActive(assigneeId, tenantId))
+            .map(UserDirectory.UserRef::name)
+            .filter(n -> !n.isBlank())
+            .orElse(assigneeId);
     }
 
     private double avgResolutionHours(List<Ticket> tickets) {

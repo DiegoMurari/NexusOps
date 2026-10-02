@@ -128,7 +128,7 @@ export class NxCellDirective {
   `,
   styles: [`
     :host { display: block; }
-    .dt-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-m); background: var(--surface); }
+    .dt-wrap { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-m); background: var(--surface); }
     .dt { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
 
     th {

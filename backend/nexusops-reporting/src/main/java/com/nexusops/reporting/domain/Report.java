@@ -102,6 +102,8 @@ public class Report implements TenantAware {
         SLA_COMPLIANCE,
         AGENT_PERFORMANCE,
         CATEGORY_DISTRIBUTION,
-        TREND_ANALYSIS
+        TREND_ANALYSIS,
+        /** Tickets ainda não resolvidos, por idade; independe do período escolhido. */
+        BACKLOG
     }
 }

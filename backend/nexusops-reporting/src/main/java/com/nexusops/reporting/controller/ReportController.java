@@ -48,6 +48,15 @@ public class ReportController {
         return ResponseEntity.ok(reportService.overview(tenant(), days));
     }
 
+    @GetMapping("/builtin")
+    @PreAuthorize("hasPermission('REPORT', 'READ')")
+    @Operation(summary = "Run a built-in analysis directly (no saved report needed)")
+    public ResponseEntity<ReportResultDto> builtin(
+            @RequestParam Report.ReportType type,
+            @RequestParam(defaultValue = "" + ReportDataService.DEFAULT_DAYS) int days) {
+        return ResponseEntity.ok(reportService.runBuiltin(type, tenant(), days));
+    }
+
     @GetMapping("/types")
     @PreAuthorize("hasPermission('REPORT', 'READ')")
     @Operation(summary = "List supported report types")
