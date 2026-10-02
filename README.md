@@ -2,6 +2,44 @@
 
 **Service Desk & IT Operations Platform** - A modular monolith built with Java 21, Spring Boot 3, Angular 17+, and cloud-native technologies.
 
+## Highlights
+
+- **Analyst console**: tickets by *my queues*, *assigned to me*, *unassigned* or the whole operation, with queue filters, ticket context (queue, topic, area, requester, form answers), queue moves, assignment by queue members and public replies or internal notes.
+- **Requester portal**: a separate experience, not a trimmed console. Requesters pick a topic from the service catalog, fill a versioned dynamic form, attach evidence and follow progress in plain language. They never see queues, priorities or SLA.
+- **Service flow** ([ADR-013](docs/adr/ADR-013-service-flow.md)): state machine with reopen cycles, SLA per cycle with pause and resume, append-only timeline, routing rules with a simulator, evidence with type and size validation.
+- **Administration**: users, queues and members, catalog and forms, routing rules, roles and permissions, feature flags, settings and audit trail.
+- **Security**: JWT auth, role- and permission-based menus and APIs, two-step verification (TOTP) with recovery codes.
+- **Light by default, dark on demand**: a theme toggle sits at the top of every screen.
+
+## Screenshots
+
+The captures below use demo data (fictional people, queues and tickets).
+
+### Analyst console
+
+| | |
+|---|---|
+| ![Login](docs/screenshots/01-login.png) **Sign in** | ![Overview](docs/screenshots/02-dashboard.png) **Overview**: live indicators, focus incident and SLA at risk |
+| ![Tickets](docs/screenshots/03-tickets.png) **Tickets** by scope, queue and status | ![Ticket detail](docs/screenshots/04-ticket-detalhe.png) **Ticket detail**: context, actions, reply and timeline |
+| ![New ticket](docs/screenshots/05-novo-ticket.png) **New ticket** from a catalog topic with its dynamic form | ![Dark theme](docs/screenshots/12-dashboard-escuro.png) **Dark theme** |
+
+### Requester portal
+
+| | |
+|---|---|
+| ![My requests](docs/screenshots/13-portal-pedidos.png) **My requests** in plain language | ![New request](docs/screenshots/14-portal-novo-pedido.png) **New request**: pick a topic from the catalog |
+
+![Request detail](docs/screenshots/15-portal-pedido.png)
+**Request detail**: public progress, the team's message and a reply box
+
+### Administration
+
+| | |
+|---|---|
+| ![Queues](docs/screenshots/07-admin-filas.png) **Queues** and members | ![Catalog](docs/screenshots/08-admin-catalogo.png) **Service catalog**: areas, topics, default queue and priority |
+| ![Routing](docs/screenshots/09-admin-roteamento.png) **Routing rules** with a simulator | ![SLA](docs/screenshots/06-sla.png) **SLA definitions** |
+| ![Roles](docs/screenshots/10-admin-papeis.png) **Roles and permissions** | ![Security](docs/screenshots/11-seguranca-mfa.png) **Account security**: two-step verification |
+
 ## Tech Stack
 
 | Layer | Technology |
