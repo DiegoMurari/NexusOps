@@ -20,6 +20,8 @@ export interface AssetDto {
   specifications: string | null;
   locationId: string | null;
   assignedToId: string | null;
+  assignedToName?: string | null;
+  locationName?: string | null;
   purchaseDate: string | null;
   warrantyExpiration: string | null;
   purchaseCost: number | null;
@@ -85,6 +87,41 @@ export interface CIRelationshipDto {
   createdBy: string | null;
 }
 
+export interface AssetHistoryDto {
+  id: string;
+  eventType: 'CREATED' | 'FIELD_CHANGED' | 'TICKET_LINKED' | 'TICKET_UNLINKED';
+  fieldName?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  actor: string | null;
+  createdAt: string;
+}
+
+export interface AssigneeDto {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface LinkedTicketDto {
+  ticketId: string;
+  ticketNumber: string;
+  title: string;
+  status: string;
+  linkedBy: string | null;
+  linkedAt: string;
+}
+
+export interface LinkedAssetDto {
+  assetId: string;
+  assetTag: string;
+  name: string;
+  type: string;
+  lifecycleStatus: string;
+  linkedBy: string | null;
+  linkedAt: string;
+}
+
 export interface PageResponse<T> {
   content: T[];
   totalElements: number;
@@ -131,5 +168,30 @@ export class AssetService {
 
   listRelationships(assetId: string): Observable<CIRelationshipDto[]> {
     return this.http.get<CIRelationshipDto[]>(`${this.relationshipsBase}/asset/${assetId}`);
+  }
+
+  history(assetId: string, page = 0, size = 20): Observable<PageResponse<AssetHistoryDto>> {
+    const params = new HttpParams().set('page', page).set('size', size);
+    return this.http.get<PageResponse<AssetHistoryDto>>(`${this.base}/${assetId}/history`, { params });
+  }
+
+  linkedTickets(assetId: string): Observable<LinkedTicketDto[]> {
+    return this.http.get<LinkedTicketDto[]>(`${this.base}/${assetId}/tickets`);
+  }
+
+  linkTicket(assetId: string, ticketId: string): Observable<LinkedTicketDto> {
+    return this.http.put<LinkedTicketDto>(`${this.base}/${assetId}/tickets/${ticketId}`, null);
+  }
+
+  unlinkTicket(assetId: string, ticketId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${assetId}/tickets/${ticketId}`);
+  }
+
+  assignees(q: string): Observable<AssigneeDto[]> {
+    return this.http.get<AssigneeDto[]>(`${this.base}/assignees`, { params: new HttpParams().set('q', q) });
+  }
+
+  assetsOfTicket(ticketId: string): Observable<LinkedAssetDto[]> {
+    return this.http.get<LinkedAssetDto[]>(`${this.base}/by-ticket/${ticketId}`);
   }
 }

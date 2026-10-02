@@ -15,6 +15,8 @@ public interface AssetRepository extends JpaRepository<Asset, String> {
 
     Optional<Asset> findByIdAndTenantId(String id, String tenantId);
 
+    java.util.List<Asset> findByTenantIdAndIdIn(String tenantId, java.util.Collection<String> ids);
+
     Optional<Asset> findByAssetTagAndTenantId(String assetTag, String tenantId);
 
     Page<Asset> findByTenantId(String tenantId, Pageable pageable);

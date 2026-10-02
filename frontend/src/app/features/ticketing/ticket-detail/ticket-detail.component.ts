@@ -9,6 +9,9 @@ import {
   TicketEventDto, TicketCyclesDto, ConsoleContext,
 } from '../../../core/ticketing/ticket.service';
 import { CatalogService, QueueDto, QueueMemberDto } from '../../../core/catalog/catalog.service';
+import { AssetService, LinkedAssetDto } from '../../../core/asset/asset.service';
+import { ArticleDto, KnowledgeService, LinkedArticleDto } from '../../../core/knowledge/knowledge.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { EvidenceDto, EvidenceService, EvidenceSubject, EVIDENCE_ACCEPT } from '../../../core/ticketing/evidence.service';
 import {
   ActionIconComponent, ActionName, ChainNode, ContextChainComponent, PriorityLevel, PriorityMarkComponent,
@@ -277,6 +280,54 @@ function verbFor(from: TicketStatus, target: TicketStatus): { label: string; ico
               }
             </section>
           }
+          @if (canReadAssets) {
+            <section class="panel" aria-label="Ativos relacionados">
+              <h2>Ativos relacionados</h2>
+              @if (assets().length === 0) {
+                <p class="note">Nenhum ativo vinculado. O vínculo é feito na tela do ativo.</p>
+              } @else {
+                <ul class="asset-list">
+                  @for (a of assets(); track a.assetId) {
+                    <li>
+                      <a [routerLink]="['/assets', a.assetId]"><span class="mono">{{ a.assetTag }}</span> {{ a.name }}</a>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+          @if (canReadKnowledge) {
+            <section class="panel" aria-label="Artigos relacionados">
+              <h2>Artigos relacionados</h2>
+              @if (articleError()) { <p class="form-error" role="alert">{{ articleError() }}</p> }
+              @if (canLinkArticles) {
+                <input class="input" type="search" placeholder="Buscar artigo publicado" aria-label="Buscar artigo para vincular"
+                       [ngModel]="articleQuery()" (ngModelChange)="searchArticles($event)" />
+                @if (articleResults().length > 0) {
+                  <ul class="asset-list picks" role="listbox" aria-label="Artigos encontrados">
+                    @for (r of articleResults(); track r.id) {
+                      <li><button type="button" class="pick" (click)="linkArticle(r.id)">{{ r.title }}</button></li>
+                    }
+                  </ul>
+                }
+              }
+              @if (articles().length === 0) {
+                <p class="note">Nenhum artigo vinculado a este ticket.</p>
+              } @else {
+                <ul class="asset-list">
+                  @for (a of articles(); track a.articleId) {
+                    <li class="art-row">
+                      <a [routerLink]="['/knowledge', a.articleId]">{{ a.title }}</a>
+                      @if (canLinkArticles) {
+                        <button type="button" class="pick-remove" (click)="unlinkArticle(a.articleId)"
+                                [attr.aria-label]="'Desvincular ' + a.title">Remover</button>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
           <section class="panel">
             <h2>Detalhes</h2>
             <dl>
@@ -324,6 +375,17 @@ function verbFor(from: TicketStatus, target: TicketStatus): { label: string; ico
     select { height: var(--control-h-md); padding: 0 var(--sp-4); border: 1px solid var(--border-strong); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: var(--fw-regular) var(--fs-base) var(--sans); }
     .queue-move { margin-inline-start: 0; }
     h2.sub { margin-top: var(--sp-6); }
+    .asset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+    .asset-list a { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+    .asset-list a:hover { text-decoration: underline; }
+    .asset-list .mono { color: var(--text-muted); margin-inline-end: var(--sp-3); }
+    .panel input[type='search'] { width: 100%; box-sizing: border-box; margin-bottom: var(--sp-3); }
+    .asset-list.picks { margin: var(--sp-3) 0 var(--sp-5); border: 1px solid var(--border); border-radius: var(--radius-s); gap: 0; }
+    .pick { width: 100%; text-align: left; padding: var(--sp-3) var(--sp-4); border: 0; background: transparent; color: var(--text); cursor: pointer; }
+    .pick:hover, .pick:focus-visible { background: var(--surface-2); }
+    .art-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
+    .pick-remove { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); }
+    .pick-remove:hover { color: var(--critical); }
     input, textarea {
       font: var(--fw-regular) var(--fs-base) var(--sans);
       color: var(--text);
@@ -441,7 +503,9 @@ export class TicketDetailComponent implements OnInit {
     if (!t) return [];
     const nodes: ChainNode[] = [{ kind: 'Ticket', value: t.ticketNumber, tone: 'focus' }];
     nodes.push({ kind: 'Solicitante', value: this.context()?.reporterName ?? t.reporterId });
-    if (t.ciReference) nodes.push({ kind: 'Ativo', value: t.ciReference });
+    const linked = this.assets();
+    if (linked.length > 0) nodes.push({ kind: 'Ativo', value: linked.length === 1 ? linked[0].assetTag : `${linked[0].assetTag} +${linked.length - 1}` });
+    else if (t.ciReference) nodes.push({ kind: 'Ativo', value: t.ciReference });
     const s = this.sla();
     if (s) nodes.push({ kind: 'SLA', value: s.label, tone: s.state === 'crit' ? 'crit' : undefined });
     return nodes;
@@ -450,12 +514,79 @@ export class TicketDetailComponent implements OnInit {
   tone = ticketStatusTone;
   glyph = ticketStatusGlyph;
 
+  assets = signal<LinkedAssetDto[]>([]);
+  articles = signal<LinkedArticleDto[]>([]);
+  articleError = signal<string | null>(null);
+  articleQuery = signal('');
+  articleResults = signal<ArticleDto[]>([]);
+  readonly canReadAssets: boolean;
+  readonly canReadKnowledge: boolean;
+  readonly canLinkArticles: boolean;
+  private articleTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(
     private route: ActivatedRoute,
     private ticketService: TicketService,
     protected evidenceService: EvidenceService,
-    private catalog: CatalogService
-  ) {}
+    private catalog: CatalogService,
+    private assetService: AssetService,
+    private knowledge: KnowledgeService,
+    auth: AuthService
+  ) {
+    this.canReadAssets = auth.can('ASSET', 'READ');
+    this.canReadKnowledge = auth.can('KNOWLEDGE', 'READ');
+    this.canLinkArticles = auth.can('KNOWLEDGE', 'UPDATE');
+  }
+
+  private loadArticles(id: string): void {
+    this.knowledge.articlesOfTicket(id).subscribe({
+      next: a => this.articles.set(a),
+      error: () => this.articles.set([])
+    });
+  }
+
+  searchArticles(query: string): void {
+    this.articleQuery.set(query);
+    if (this.articleTimer) clearTimeout(this.articleTimer);
+    const q = query.trim();
+    if (q.length < 2) {
+      this.articleResults.set([]);
+      return;
+    }
+    this.articleTimer = setTimeout(() => {
+      this.knowledge.listArticles({ status: 'PUBLISHED', search: q, size: 6 }).subscribe({
+        next: res => {
+          const linked = new Set(this.articles().map(a => a.articleId));
+          this.articleResults.set(res.content.filter(a => !linked.has(a.id)));
+        },
+        error: () => this.articleResults.set([])
+      });
+    }, 300);
+  }
+
+  linkArticle(articleId: string): void {
+    const t = this.ticket();
+    if (!t) return;
+    this.articleError.set(null);
+    this.knowledge.linkTicket(articleId, t.id).subscribe({
+      next: () => {
+        this.articleQuery.set('');
+        this.articleResults.set([]);
+        this.loadArticles(t.id);
+      },
+      error: () => this.articleError.set('Não foi possível vincular o artigo.')
+    });
+  }
+
+  unlinkArticle(articleId: string): void {
+    const t = this.ticket();
+    if (!t) return;
+    this.articleError.set(null);
+    this.knowledge.unlinkTicket(articleId, t.id).subscribe({
+      next: () => this.loadArticles(t.id),
+      error: () => this.articleError.set('Não foi possível desvincular o artigo.')
+    });
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -497,6 +628,10 @@ export class TicketDetailComponent implements OnInit {
     this.ticketService.timeline(id).subscribe({ next: e => this.events.set(e), error: () => this.events.set([]) });
     this.ticketService.cycles(id).subscribe({ next: c => this.cycles.set(c), error: () => this.cycles.set(null) });
     this.evidenceService.list(id).subscribe({ next: a => this.evidence.set(a), error: () => this.evidence.set([]) });
+    if (this.canReadAssets) {
+      this.assetService.assetsOfTicket(id).subscribe({ next: a => this.assets.set(a), error: () => this.assets.set([]) });
+    }
+    if (this.canReadKnowledge) this.loadArticles(id);
   }
 
   evidenceOf(e: TicketEventDto): EvidenceDto[] {

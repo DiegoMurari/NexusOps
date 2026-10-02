@@ -25,6 +25,9 @@ public class AssetDto {
     private String specifications;
     private String locationId;
     private String assignedToId;
+    /** Nomes legíveis, preenchidos só no detalhe do ativo. */
+    private String assignedToName;
+    private String locationName;
     private Instant purchaseDate;
     private Instant warrantyExpiration;
     private BigDecimal purchaseCost;
