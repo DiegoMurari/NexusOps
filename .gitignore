@@ -27,5 +27,11 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Claude Code local state
+# Local tooling state
 .claude/
+
+# Local evidence storage
+data/
+
+# Test coverage output
+frontend/coverage/

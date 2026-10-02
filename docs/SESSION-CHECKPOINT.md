@@ -1,7 +1,7 @@
 # NexusOps — Session Checkpoint
 
 **Data do checkpoint:** 2026-09-29 (revisado em 2026-09-30 para refletir o estado real do ambiente antes de encerrar)
-**Propósito:** Permitir que outra sessão do Claude Code retome o trabalho exatamente de onde parou, sem depender do histórico de conversa desta sessão.
+**Propósito:** Permitir que outra sessão de trabalho retome o trabalho exatamente de onde parou, sem depender do histórico de conversa desta sessão.
 
 ---
 
@@ -220,7 +220,7 @@ Iniciar **P3 — Reports**, seguindo a mesma metodologia usada em P0/P1/P2:
    - **E**: checar se qualquer constraint `UNIQUE` de negócio (slug, nome, código) está escopada por tenant, não global.
 3. `nexusops-bootstrap/pom.xml` tem a dependência do reporting **comentada** (bloco junto com integration) — precisa ser ativada isoladamente (não ativar integration junto, ver seção 11).
 4. Seguir os 7 passos de execução por módulo (compilar → testar → frontend → navegador → console → segurança → integração) antes de apresentar o relatório e avançar ao P4.
-5. **Estado dos processos ao final desta sessão (verificado via `netstat`/`docker ps` antes de encerrar):** o **backend NÃO está rodando** (porta 8080 sem listener) — o processo `mvnw.cmd spring-boot:run` que estava servindo as requisições durante o desenvolvimento e QA do P2 foi finalizado pelo próprio harness do Claude Code por baixa memória do sistema enquanto a sessão ficava ociosa entre turnos (não foi um crash da aplicação nem um bug introduzido). O **frontend continua rodando** (`ng serve` na porta 4200, com hot-reload). Os containers Docker (`nexusops-postgres`, `nexusops-redis`, `nexusops-mailhog`) continuam rodando normalmente. **Antes de iniciar P3, subir o backend novamente**: `cd backend`, setar `JAVA_HOME`/`PATH` para o JDK 21 (ver seção 12), depois `.\mvnw.cmd -pl nexusops-bootstrap spring-boot:run` (rodar em background, sem `-am`). O Flyway vai reaplicar o estado do schema normalmente (idempotente).
+5. **Estado dos processos ao final desta sessão (verificado via `netstat`/`docker ps` antes de encerrar):** o **backend NÃO está rodando** (porta 8080 sem listener) — o processo `mvnw.cmd spring-boot:run` que estava servindo as requisições durante o desenvolvimento e QA do P2 foi finalizado pelo próprio ambiente de execução por baixa memória do sistema enquanto a sessão ficava ociosa entre turnos (não foi um crash da aplicação nem um bug introduzido). O **frontend continua rodando** (`ng serve` na porta 4200, com hot-reload). Os containers Docker (`nexusops-postgres`, `nexusops-redis`, `nexusops-mailhog`) continuam rodando normalmente. **Antes de iniciar P3, subir o backend novamente**: `cd backend`, setar `JAVA_HOME`/`PATH` para o JDK 21 (ver seção 12), depois `.\mvnw.cmd -pl nexusops-bootstrap spring-boot:run` (rodar em background, sem `-am`). O Flyway vai reaplicar o estado do schema normalmente (idempotente).
 
 ---
 
@@ -265,7 +265,7 @@ Iniciar **P3 — Reports**, seguindo a mesma metodologia usada em P0/P1/P2:
 - Docker (Postgres/Redis/Mailhog) já está rodando persistentemente neste ambiente (`nexusops-postgres`, `nexusops-redis`, `nexusops-mailhog`) — não precisa subir.
 - Frontend: `ng serve` já roda persistentemente na porta 4200 com hot-reload — mudanças em componentes Angular refletem automaticamente, não precisa restart.
 - **Backend em 8080 NÃO está rodando neste momento** (confirmado via `netstat` ao final desta sessão) — precisa ser iniciado manualmente antes de começar P3. Precisa também de restart manual toda vez que houver mudança em entidade/migração/controller (não tem hot-reload).
-- **Lição operacional desta sessão**: rodar `spring-boot:run` via `run_in_background` mantém o processo vivo e servindo normalmente enquanto a sessão está ativa, mas o harness do Claude Code pode encerrá-lo automaticamente se a sessão ficar ociosa e o sistema estiver com pouca memória (isso aconteceu nesta sessão, sem relação com bug de código). Se isso acontecer de novo, apenas reiniciar o processo — não é preciso investigar como se fosse uma falha da aplicação.
+- **Lição operacional desta sessão**: rodar `spring-boot:run` via `run_in_background` mantém o processo vivo e servindo normalmente enquanto a sessão está ativa, mas o ambiente de execução pode encerrá-lo automaticamente se a sessão ficar ociosa e o sistema estiver com pouca memória (isso aconteceu nesta sessão, sem relação com bug de código). Se isso acontecer de novo, apenas reiniciar o processo — não é preciso investigar como se fosse uma falha da aplicação.
 - Login de dev: `username: admin@nexusops.com`, `password: admin123456` (nota: o campo do JSON de login é **`username`**, não `email`, apesar do valor ser um email) — retorna `accessToken` com expiração de 900s (15 min).
 - Tenant de dev: `00000000-0000-0000-0000-000000000000` (super-admin, todas as permissões).
 - Repositório git **não tem nenhum commit ainda** — todo o conteúdo aparece como untracked (`??`) no `git status`. Nenhuma alteração desta sessão foi commitada.
@@ -280,6 +280,6 @@ Iniciar **P3 — Reports**, seguindo a mesma metodologia usada em P0/P1/P2:
 - Rotas de controller: **sem** prefixo `/api/v1` (já vem do `context-path` global) — bare paths como `/articles`, `/assets`.
 
 **Onde encontrar mais contexto:**
-- Memória persistente do Claude Code (fora do repo) tem 4 registros relevantes: `nexusops_visual_direction_approved`, `nexusops_implementation_priorities`, `nexusops_systemic_backend_bugs`, `nexusops_session_completion_state` — consultar antes de assumir qualquer estado do projeto.
+- Memória persistente da ferramenta de desenvolvimento (fora do repo) tem 4 registros relevantes: `nexusops_visual_direction_approved`, `nexusops_implementation_priorities`, `nexusops_systemic_backend_bugs`, `nexusops_session_completion_state` — consultar antes de assumir qualquer estado do projeto.
 - `docs/adr/ADR-012-phased-implementation.md` — roadmap original de fases (P0-P6 mapeia a esse ADR).
 - `docs/audit/*.md` — auditorias de arquitetura/backend/banco/frontend feitas antes desta leva de sessões P0-P6; a base do porquê certas decisões legadas foram sinalizadas como problemáticas.
