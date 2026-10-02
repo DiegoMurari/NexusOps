@@ -13,6 +13,7 @@ import com.nexusops.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,8 @@ import java.time.Instant;
 @RequiredArgsConstructor
 @Transactional
 public class ArticleService {
+
+    private static final char ESCAPE = '\\';
 
     private final ArticleRepository articleRepository;
     private final KnowledgeCategoryRepository categoryRepository;
@@ -53,28 +56,49 @@ public class ArticleService {
     }
 
     @Transactional(readOnly = true)
+    /**
+     * Listagem com filtros combináveis. Quem não pode editar a base ({@code canManage = false}) só vê artigos
+     * publicados, qualquer que seja o filtro de situação pedido.
+     */
     public Page<ArticleDto> list(String tenantId, Article.ArticleStatus status, String categoryId,
-                                  Boolean featured, String search, Pageable pageable) {
-        Page<Article> page;
-        if (search != null && !search.isBlank()) {
-            page = articleRepository.search(tenantId, search.trim(), pageable);
+                                  Boolean featured, String search, boolean canManage, Pageable pageable) {
+        Specification<Article> spec = (root, query, cb) -> cb.equal(root.get("tenantId"), tenantId);
+        if (!canManage) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), Article.ArticleStatus.PUBLISHED));
         } else if (status != null) {
-            page = articleRepository.findByTenantIdAndStatus(tenantId, status, pageable);
-        } else if (categoryId != null) {
-            page = articleRepository.findByTenantIdAndCategoryId(tenantId, categoryId, pageable);
-        } else if (Boolean.TRUE.equals(featured)) {
-            page = articleRepository.findByTenantIdAndFeaturedTrue(tenantId, pageable);
-        } else {
-            page = articleRepository.findByTenantId(tenantId, pageable);
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
         }
-        return page.map(articleMapper::toDto);
+        if (categoryId != null && !categoryId.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("categoryId"), categoryId));
+        }
+        if (Boolean.TRUE.equals(featured)) {
+            spec = spec.and((root, query, cb) -> cb.isTrue(root.get("featured")));
+        }
+        if (search != null && !search.isBlank()) {
+            String like = "%" + escapeLike(search.trim().toLowerCase()) + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                cb.like(cb.lower(root.get("title")), like, ESCAPE),
+                cb.like(cb.lower(root.get("excerpt")), like, ESCAPE),
+                cb.like(cb.lower(root.get("content")), like, ESCAPE)));
+        }
+        return articleRepository.findAll(spec, pageable).map(articleMapper::toDto);
     }
 
-    public ArticleDto getAndRecordView(String id, String tenantId) {
+    /** Rascunhos e arquivados só existem para quem pode editar; para os demais são 404, e não contam visualização. */
+    public ArticleDto getAndRecordView(String id, String tenantId, boolean canManage) {
         Article article = articleRepository.findByIdAndTenantId(id, tenantId)
+            .filter(a -> canManage || a.getStatus() == Article.ArticleStatus.PUBLISHED)
             .orElseThrow(() -> new ResourceNotFoundException("Article", id));
-        article.setViewCount(article.getViewCount() + 1);
-        return articleMapper.toDto(articleRepository.save(article));
+        if (article.getStatus() == Article.ArticleStatus.PUBLISHED) {
+            article.setViewCount(article.getViewCount() + 1);
+            article = articleRepository.save(article);
+        }
+        return articleMapper.toDto(article);
+    }
+
+    /** Escapa os curingas do LIKE para que o texto buscado seja casado literalmente. */
+    static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     @Transactional(readOnly = true)

@@ -5,6 +5,23 @@ import { environment } from '../../../environments/environment';
 
 export type ArticleStatus = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED';
 
+export interface LinkedTicketDto {
+  ticketId: string;
+  ticketNumber: string;
+  title: string;
+  status: string;
+  linkedBy: string | null;
+  linkedAt: string;
+}
+
+export interface LinkedArticleDto {
+  articleId: string;
+  title: string;
+  status: string;
+  linkedBy: string | null;
+  linkedAt: string;
+}
+
 export interface ArticleDto {
   id: string;
   title: string;
@@ -139,6 +156,22 @@ export class KnowledgeService {
 
   deleteArticle(id: string): Observable<void> {
     return this.http.delete<void>(`${this.articlesBase}/${id}`);
+  }
+
+  linkedTickets(articleId: string): Observable<LinkedTicketDto[]> {
+    return this.http.get<LinkedTicketDto[]>(`${this.articlesBase}/${articleId}/tickets`);
+  }
+
+  linkTicket(articleId: string, ticketId: string): Observable<LinkedTicketDto> {
+    return this.http.put<LinkedTicketDto>(`${this.articlesBase}/${articleId}/tickets/${ticketId}`, null);
+  }
+
+  unlinkTicket(articleId: string, ticketId: string): Observable<void> {
+    return this.http.delete<void>(`${this.articlesBase}/${articleId}/tickets/${ticketId}`);
+  }
+
+  articlesOfTicket(ticketId: string): Observable<LinkedArticleDto[]> {
+    return this.http.get<LinkedArticleDto[]>(`${this.articlesBase}/by-ticket/${ticketId}`);
   }
 
   submitFeedback(articleId: string, helpful: boolean, comment?: string): Observable<ArticleFeedbackDto> {

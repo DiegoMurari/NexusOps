@@ -1,9 +1,14 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { ArticleDto, ArticleStatus, CategoryDto, KnowledgeService } from '../../../core/knowledge/knowledge.service';
+import { ArticleDto, ArticleStatus, CategoryDto, KnowledgeService, LinkedTicketDto } from '../../../core/knowledge/knowledge.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { TicketDto, TicketService } from '../../../core/ticketing/ticket.service';
+import { StatusBadgeComponent } from '../../../shared/components';
+
+type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'critical';
 
 const STATUS_LABELS: Record<ArticleStatus, string> = {
   DRAFT: 'Rascunho',
@@ -15,7 +20,7 @@ const STATUS_LABELS: Record<ArticleStatus, string> = {
 @Component({
   selector: 'app-article-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, ReactiveFormsModule, MatIconModule],
+  imports: [CommonModule, RouterLink, FormsModule, ReactiveFormsModule, MatIconModule, StatusBadgeComponent],
   template: `
     @if (article(); as a) {
       <div class="detail-header">
@@ -24,8 +29,8 @@ const STATUS_LABELS: Record<ArticleStatus, string> = {
           <span>Voltar</span>
         </a>
         <div class="title-row">
-          <span class="status-tag" [class]="a.status.toLowerCase()">{{ statusLabel(a.status) }}</span>
-          @if (a.featured) { <span class="featured-tag">Destaque</span> }
+          <nx-status-badge [tone]="statusTone(a.status)">{{ statusLabel(a.status) }}</nx-status-badge>
+          @if (a.featured) { <nx-status-badge tone="info">Destaque</nx-status-badge> }
         </div>
         @if (!editing()) {
           <h1 class="page-title">{{ a.title }}</h1>
@@ -65,10 +70,12 @@ const STATUS_LABELS: Record<ArticleStatus, string> = {
           } @else {
             <div class="content-header">
               <h3 class="card-title">Conteúdo</h3>
-              <button class="btn-link" (click)="startEdit()">
-                <mat-icon>edit</mat-icon>
-                <span>Editar</span>
-              </button>
+              @if (canManage) {
+                <button class="btn-link" (click)="startEdit()">
+                  <mat-icon>edit</mat-icon>
+                  <span>Editar</span>
+                </button>
+              }
             </div>
             @if (a.excerpt) {
               <p class="excerpt">{{ a.excerpt }}</p>
@@ -86,25 +93,70 @@ const STATUS_LABELS: Record<ArticleStatus, string> = {
         </div>
 
         <div class="side-col">
-          <div class="card">
-            <h3 class="card-title">Ações</h3>
+          @if (canManage) {
+            <div class="card">
+              <h3 class="card-title">Ações</h3>
 
-            @if (actionError()) {
-              <div class="form-error">
-                <mat-icon>error_outline</mat-icon>
-                <span>{{ actionError() }}</span>
+              @if (actionError()) {
+                <div class="form-error">
+                  <mat-icon>error_outline</mat-icon>
+                  <span>{{ actionError() }}</span>
+                </div>
+              }
+
+              <div class="actions-list">
+                @if (a.status !== 'PUBLISHED') {
+                  <button class="btn-primary" [disabled]="acting()" (click)="publish()">Publicar</button>
+                }
+                @if (a.status === 'PUBLISHED') {
+                  <button class="btn-secondary" [disabled]="acting()" (click)="archive()">Arquivar</button>
+                }
+                <button class="btn-danger" [disabled]="acting()" (click)="deleteArticle()">Excluir</button>
+              </div>
+            </div>
+          }
+
+          <div class="card">
+            <h3 class="card-title">Tickets relacionados</h3>
+            @if (ticketError()) {
+              <div class="form-error"><mat-icon>error_outline</mat-icon><span>{{ ticketError() }}</span></div>
+            }
+            @if (canManage && a.status === 'PUBLISHED') {
+              <div class="link-box">
+                <input class="input" type="search" placeholder="Buscar ticket por número ou título" aria-label="Buscar ticket para vincular"
+                       [ngModel]="ticketQuery()" (ngModelChange)="searchTickets($event)" [ngModelOptions]="{standalone: true}" />
+                @if (ticketResults().length > 0) {
+                  <ul class="results" role="listbox" aria-label="Tickets encontrados">
+                    @for (t of ticketResults(); track t.id) {
+                      <li>
+                        <button type="button" (click)="linkTicket(t.id)" [disabled]="acting()">
+                          <span class="mono">{{ t.ticketNumber }}</span>
+                          <span class="result-title">{{ t.title }}</span>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
               </div>
             }
-
-            <div class="actions-list">
-              @if (a.status !== 'PUBLISHED') {
-                <button class="btn-primary" [disabled]="acting()" (click)="publish()">Publicar</button>
-              }
-              @if (a.status === 'PUBLISHED') {
-                <button class="btn-secondary" [disabled]="acting()" (click)="archive()">Arquivar</button>
-              }
-              <button class="btn-danger" [disabled]="acting()" (click)="deleteArticle()">Excluir</button>
-            </div>
+            @if (linkedTickets().length === 0) {
+              <p class="description muted">Nenhum ticket usou este artigo ainda.</p>
+            } @else {
+              <ul class="linked-list">
+                @for (t of linkedTickets(); track t.ticketId) {
+                  <li>
+                    <a [routerLink]="['/tickets', t.ticketId]" class="linked-main">
+                      <span class="mono">{{ t.ticketNumber }}</span>
+                      <span class="linked-title">{{ t.title }}</span>
+                    </a>
+                    @if (canManage) {
+                      <button type="button" class="link-remove" (click)="unlinkTicket(t.ticketId)" [disabled]="acting()"
+                              [attr.aria-label]="'Desvincular ' + t.ticketNumber">Remover</button>
+                    }
+                  </li>
+                }
+              </ul>
+            }
           </div>
 
           <div class="card">
@@ -194,34 +246,26 @@ const STATUS_LABELS: Record<ArticleStatus, string> = {
       color: var(--text);
     }
 
-    .status-tag {
-      display: inline-flex;
-      align-items: center;
-      height: 22px;
-      padding: 0 10px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 600;
-      background: var(--surface-2);
-      color: var(--text-muted);
-
-      &.published { background: var(--success-soft); color: var(--success); }
-      &.draft { background: var(--accent-soft); color: var(--accent); }
-      &.review { background: var(--warning-soft); color: var(--warning); }
-      &.archived { background: var(--critical-soft); color: var(--critical); }
+    .link-box { position: relative; margin-bottom: var(--sp-5); }
+    .link-box input { width: 100%; box-sizing: border-box; }
+    .results {
+      list-style: none; margin: var(--sp-2) 0 0; padding: 0;
+      border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface);
+      max-height: 220px; overflow-y: auto;
     }
-
-    .featured-tag {
-      display: inline-flex;
-      align-items: center;
-      height: 22px;
-      padding: 0 10px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 600;
-      background: var(--warning-soft);
-      color: var(--warning);
+    .results button {
+      display: flex; gap: var(--sp-4); align-items: baseline; width: 100%; text-align: left;
+      padding: var(--sp-3) var(--sp-4); border: 0; background: transparent; color: var(--text); cursor: pointer;
     }
+    .results button:hover:not(:disabled), .results button:focus-visible { background: var(--surface-2); }
+    .result-title { color: var(--text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .linked-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+    .linked-list li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
+    .linked-main { display: flex; gap: var(--sp-4); align-items: baseline; min-width: 0; color: var(--text); text-decoration: none; }
+    .linked-main:hover .linked-title { text-decoration: underline; }
+    .linked-title { color: var(--text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .link-remove { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; }
+    .link-remove:hover:not(:disabled) { color: var(--critical); }
 
     .detail-grid {
       display: grid;
@@ -451,6 +495,13 @@ export class ArticleDetailComponent implements OnInit {
   editing = signal(false);
   saving = signal(false);
   feedbackSent = signal(false);
+  linkedTickets = signal<LinkedTicketDto[]>([]);
+  ticketError = signal<string | null>(null);
+  ticketQuery = signal('');
+  ticketResults = signal<TicketDto[]>([]);
+  /** Quem pode editar a base também publica, arquiva, exclui e vincula tickets. */
+  readonly canManage: boolean;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   editForm: FormGroup;
 
@@ -458,8 +509,11 @@ export class ArticleDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private fb: FormBuilder,
-    private knowledgeService: KnowledgeService
+    private knowledgeService: KnowledgeService,
+    private ticketService: TicketService,
+    auth: AuthService
   ) {
+    this.canManage = auth.can('KNOWLEDGE', 'UPDATE');
     this.editForm = this.fb.group({
       title: ['', [Validators.required, Validators.maxLength(500)]],
       excerpt: [''],
@@ -490,10 +544,82 @@ export class ArticleDetailComponent implements OnInit {
       next: a => {
         this.article.set(a);
         this.loading.set(false);
+        this.loadTickets(a.id);
       },
       error: () => {
         this.error.set('Artigo não encontrado.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  statusTone(status: ArticleStatus): Tone {
+    switch (status) {
+      case 'PUBLISHED': return 'success';
+      case 'REVIEW': return 'warning';
+      case 'ARCHIVED': return 'neutral';
+      default: return 'info';
+    }
+  }
+
+  private loadTickets(id: string): void {
+    this.knowledgeService.linkedTickets(id).subscribe({
+      next: list => this.linkedTickets.set(list),
+      error: () => this.ticketError.set('Não foi possível carregar os tickets relacionados.')
+    });
+  }
+
+  searchTickets(query: string): void {
+    this.ticketQuery.set(query);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    const q = query.trim();
+    if (q.length < 2) {
+      this.ticketResults.set([]);
+      return;
+    }
+    this.searchTimer = setTimeout(() => {
+      this.ticketService.queueView({ scope: 'ALL', q, size: 6 }).subscribe({
+        next: res => {
+          const linked = new Set(this.linkedTickets().map(t => t.ticketId));
+          this.ticketResults.set(res.content.filter(t => !linked.has(t.id)));
+        },
+        error: () => this.ticketResults.set([])
+      });
+    }, 300);
+  }
+
+  linkTicket(ticketId: string): void {
+    const a = this.article();
+    if (!a) return;
+    this.acting.set(true);
+    this.ticketError.set(null);
+    this.knowledgeService.linkTicket(a.id, ticketId).subscribe({
+      next: () => {
+        this.acting.set(false);
+        this.ticketQuery.set('');
+        this.ticketResults.set([]);
+        this.loadTickets(a.id);
+      },
+      error: () => {
+        this.acting.set(false);
+        this.ticketError.set('Não foi possível vincular o ticket.');
+      }
+    });
+  }
+
+  unlinkTicket(ticketId: string): void {
+    const a = this.article();
+    if (!a) return;
+    this.acting.set(true);
+    this.ticketError.set(null);
+    this.knowledgeService.unlinkTicket(a.id, ticketId).subscribe({
+      next: () => {
+        this.acting.set(false);
+        this.loadTickets(a.id);
+      },
+      error: () => {
+        this.acting.set(false);
+        this.ticketError.set('Não foi possível desvincular o ticket.');
       }
     });
   }

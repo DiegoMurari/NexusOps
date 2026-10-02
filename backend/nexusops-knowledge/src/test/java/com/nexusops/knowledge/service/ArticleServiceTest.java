@@ -166,14 +166,45 @@ class ArticleServiceTest {
     }
 
     @Test
-    void getAndRecordView_incrementsViewCount() {
-        Article article = Article.builder().id("art-1").tenantId(TENANT_ID).viewCount(5).build();
+    void getAndRecordView_incrementsViewCountOfPublishedArticles() {
+        Article article = Article.builder().id("art-1").tenantId(TENANT_ID).viewCount(5)
+            .status(Article.ArticleStatus.PUBLISHED).build();
         when(articleRepository.findByIdAndTenantId("art-1", TENANT_ID)).thenReturn(Optional.of(article));
         when(articleRepository.save(any(Article.class))).thenAnswer(inv -> inv.getArgument(0));
         when(articleMapper.toDto(any(Article.class))).thenReturn(ArticleDto.builder().build());
 
-        articleService.getAndRecordView("art-1", TENANT_ID);
+        articleService.getAndRecordView("art-1", TENANT_ID, false);
 
         assertThat(article.getViewCount()).isEqualTo(6);
+    }
+
+    @Test
+    void getAndRecordView_hidesDraftsFromReadersWhoCannotManage() {
+        Article draft = Article.builder().id("art-1").tenantId(TENANT_ID).viewCount(0)
+            .status(Article.ArticleStatus.DRAFT).build();
+        when(articleRepository.findByIdAndTenantId("art-1", TENANT_ID)).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> articleService.getAndRecordView("art-1", TENANT_ID, false))
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(articleRepository, never()).save(any());
+    }
+
+    @Test
+    void getAndRecordView_letsEditorsOpenDraftsWithoutCountingAView() {
+        Article draft = Article.builder().id("art-1").tenantId(TENANT_ID).viewCount(0)
+            .status(Article.ArticleStatus.DRAFT).build();
+        when(articleRepository.findByIdAndTenantId("art-1", TENANT_ID)).thenReturn(Optional.of(draft));
+        when(articleMapper.toDto(draft)).thenReturn(ArticleDto.builder().id("art-1").build());
+
+        ArticleDto dto = articleService.getAndRecordView("art-1", TENANT_ID, true);
+
+        assertThat(dto.getId()).isEqualTo("art-1");
+        assertThat(draft.getViewCount()).isZero();
+        verify(articleRepository, never()).save(any());
+    }
+
+    @Test
+    void escapeLike_makesWildcardsLiteral() {
+        assertThat(ArticleService.escapeLike("100%_ok")).isEqualTo("100\\%\\_ok");
     }
 }
