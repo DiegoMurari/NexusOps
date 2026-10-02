@@ -10,6 +10,18 @@ export const ADMINISTRATION_ROUTES: Routes = [
     loadComponent: () => import('./user-management/user-management.component').then(m => m.UserManagementComponent)
   },
   {
+    path: 'queues',
+    loadComponent: () => import('./queue-management/queue-management.component').then(m => m.QueueManagementComponent)
+  },
+  {
+    path: 'catalog',
+    loadComponent: () => import('./catalog-management/catalog-management.component').then(m => m.CatalogManagementComponent)
+  },
+  {
+    path: 'routing',
+    loadComponent: () => import('./routing-management/routing-management.component').then(m => m.RoutingManagementComponent)
+  },
+  {
     path: 'tenants',
     loadComponent: () => import('./tenant-management/tenant-management.component').then(m => m.TenantManagementComponent)
   },

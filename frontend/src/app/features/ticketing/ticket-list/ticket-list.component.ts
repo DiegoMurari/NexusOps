@@ -1,8 +1,23 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
-import { TicketService, TicketDto, TicketStatus } from '../../../core/ticketing/ticket.service';
+import { map } from 'rxjs';
+import { TicketService, TicketDto, TicketStatus, QueueScope, ConsoleCounts } from '../../../core/ticketing/ticket.service';
+import { CatalogService, QueueDto } from '../../../core/catalog/catalog.service';
+import {
+  DataTableComponent,
+  NxCellDirective,
+  NxColumn,
+  PriorityLevel,
+  PriorityMarkComponent,
+  SlaRulerComponent,
+  StatusBadgeComponent,
+  slaFromTicket,
+  ticketStatusGlyph,
+  ticketStatusTone,
+} from '../../../shared/components';
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   OPEN: 'Aberto',
@@ -14,12 +29,12 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   REOPENED: 'Reaberto',
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Baixa',
-  MEDIUM: 'Média',
-  HIGH: 'Alta',
-  CRITICAL: 'Crítica',
-};
+const SCOPES: { value: QueueScope; label: string; count: keyof ConsoleCounts }[] = [
+  { value: 'MY_QUEUES', label: 'Minhas filas', count: 'myQueues' },
+  { value: 'MINE', label: 'Atribuídos a mim', count: 'mine' },
+  { value: 'UNASSIGNED', label: 'Sem responsável', count: 'unassigned' },
+  { value: 'ALL', label: 'Toda a operação', count: 'all' },
+];
 
 const STATUS_FILTERS: { value: TicketStatus | null; label: string }[] = [
   { value: null, label: 'Todos' },
@@ -34,262 +49,237 @@ const STATUS_FILTERS: { value: TicketStatus | null; label: string }[] = [
 @Component({
   selector: 'app-ticket-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule],
+  imports: [
+    DatePipe,
+    RouterLink,
+    MatIconModule,
+    DataTableComponent,
+    NxCellDirective,
+    PriorityMarkComponent,
+    SlaRulerComponent,
+    StatusBadgeComponent,
+  ],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Tickets</h1>
-      <a class="btn-primary" routerLink="new">
-        <mat-icon>add</mat-icon>
-        <span>Novo Ticket</span>
-      </a>
+    <header class="head">
+      <h1>Tickets</h1>
+      <a class="nx-verb primary" routerLink="new"><mat-icon aria-hidden="true">add</mat-icon>Novo ticket</a>
+    </header>
+
+    <div class="filters">
+      <div class="seg" role="group" aria-label="Recorte da lista">
+        @for (s of scopes; track s.value) {
+          <button type="button" [attr.aria-pressed]="scope() === s.value" (click)="setScope(s.value)">
+            {{ s.label }}@if (counts(); as c) { <span class="cnt">{{ c[s.count] }}</span> }
+          </button>
+        }
+      </div>
+      <select class="queue-sel" aria-label="Filtrar por fila" [value]="queueId() ?? ''" (change)="setQueue($any($event.target).value)">
+        <option value="">Todas as filas</option>
+        @for (q of queues(); track q.id) {
+          <option [value]="q.id">{{ q.name }}</option>
+        }
+      </select>
     </div>
 
     <div class="filters">
-      @for (f of statusFilters; track f.label) {
-        <button
-          class="filter-chip"
-          [class.active]="activeStatus() === f.value"
-          (click)="setStatus(f.value)"
-        >{{ f.label }}</button>
+      <div class="seg" role="group" aria-label="Filtrar por status">
+        @for (f of statusFilters; track f.label) {
+          <button type="button" [attr.aria-pressed]="activeStatus() === f.value" (click)="setStatus(f.value)">{{ f.label }}</button>
+        }
+      </div>
+      @if (query(); as q) {
+        <span class="q">
+          busca <b>{{ q }}</b>
+          <button type="button" class="clear" (click)="clearQuery()" aria-label="Limpar busca"><mat-icon aria-hidden="true">close</mat-icon></button>
+        </span>
       }
     </div>
 
-    @if (loading()) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">hourglass_empty</mat-icon>
-        <p>Carregando tickets…</p>
-      </div>
-    } @else if (error()) {
-      <div class="card empty-state error">
-        <mat-icon class="empty-ic">error_outline</mat-icon>
-        <p>{{ error() }}</p>
-      </div>
-    } @else if (tickets().length === 0) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">assignment</mat-icon>
-        <p>Nenhum ticket encontrado</p>
-      </div>
-    } @else {
-      <div class="card table-card">
-        <table class="ticket-table">
-          <thead>
-            <tr>
-              <th>Número</th>
-              <th>Título</th>
-              <th>Status</th>
-              <th>Prioridade</th>
-              <th>Criado em</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (ticket of tickets(); track ticket.id) {
-              <tr [routerLink]="[ticket.id]" class="ticket-row">
-                <td class="mono">{{ ticket.ticketNumber }}</td>
-                <td class="title-cell">{{ ticket.title }}</td>
-                <td>
-                  <span class="status-tag" [class]="statusClass(ticket.status)">{{ statusLabel(ticket.status) }}</span>
-                </td>
-                <td>
-                  <span class="prio" [class]="ticket.priority.toLowerCase()">
-                    <span class="bar"></span>{{ priorityLabel(ticket.priority) }}
-                  </span>
-                </td>
-                <td class="mono muted">{{ ticket.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+    @if (error()) {
+      <p class="inline-error" role="alert">{{ error() }}</p>
+    }
 
-      <div class="pagination">
-        <button class="page-btn" [disabled]="page() === 0" (click)="prevPage()">
-          <mat-icon>chevron_left</mat-icon>
+    <nx-data-table
+      caption="Tickets"
+      [columns]="columns"
+      [rows]="visible()"
+      [loading]="loading()"
+      [rowClickable]="true"
+      [rowRail]="rail"
+      emptyTitle="Nenhum ticket encontrado"
+      (rowActivate)="open($any($event))"
+    >
+      <ng-template nxCell="ticketNumber" let-t>
+        <a class="num" [routerLink]="[t.id]">{{ t.ticketNumber }}</a>
+      </ng-template>
+      <ng-template nxCell="queue" let-t>
+        @if (queueName(t.queueId); as n) { {{ n }} } @else { <span class="none">—</span> }
+      </ng-template>
+      <ng-template nxCell="assignee" let-t>
+        @if (t.assigneeId) { {{ t.assigneeId }} } @else { <span class="unassigned">Sem responsável</span> }
+      </ng-template>
+      <ng-template nxCell="status" let-t>
+        <nx-status-badge [tone]="tone(t.status)" [glyph]="glyph(t.status)">{{ label(t.status) }}</nx-status-badge>
+      </ng-template>
+      <ng-template nxCell="priority" let-t>
+        <nx-priority-mark [level]="level(t.priority)" />
+      </ng-template>
+      <ng-template nxCell="sla" let-t>
+        @if (sla(t); as s) {
+          <nx-sla-ruler [pct]="s.pct" [state]="s.state" [label]="s.label" />
+        } @else {
+          <span class="none">—</span>
+        }
+      </ng-template>
+      <ng-template nxCell="createdAt" let-t>{{ t.createdAt | date:'dd/MM/yyyy HH:mm' }}</ng-template>
+    </nx-data-table>
+
+    @if (totalPages() > 1) {
+      <nav class="pagination" aria-label="Paginação">
+        <button type="button" class="page-btn" [disabled]="page() === 0" (click)="prevPage()" aria-label="Página anterior">
+          <mat-icon aria-hidden="true">chevron_left</mat-icon>
         </button>
-        <span class="page-info">Página {{ page() + 1 }} de {{ totalPages() || 1 }}</span>
-        <button class="page-btn" [disabled]="page() + 1 >= totalPages()" (click)="nextPage()">
-          <mat-icon>chevron_right</mat-icon>
+        <span class="page-info">Página {{ page() + 1 }} de {{ totalPages() }}</span>
+        <button type="button" class="page-btn" [disabled]="page() + 1 >= totalPages()" (click)="nextPage()" aria-label="Próxima página">
+          <mat-icon aria-hidden="true">chevron_right</mat-icon>
         </button>
-      </div>
+      </nav>
     }
   `,
   styles: [`
-    :host { display: block; }
+    :host { display: grid; gap: var(--sp-6); }
+    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); }
+    h1 { margin: 0; font-size: var(--fs-xl); line-height: 28px; font-weight: var(--fw-semibold); }
+    .nx-verb mat-icon { width: 16px; height: 16px; font-size: 16px; }
 
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .btn-primary {
+    .filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-5); }
+    .q {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 18px;
+      gap: var(--sp-3);
+      height: var(--control-h-sm);
+      padding: 0 var(--sp-4);
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius-s);
-      background: var(--accent);
-      color: #fff;
-      font-weight: 500;
-      font-size: 13px;
-      text-decoration: none;
-
-      mat-icon { font-size: 18px; width: 18px; height: 18px; }
-
-      &:hover { filter: brightness(1.08); }
-    }
-
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .filter-chip {
-      height: 30px;
-      padding: 0 14px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
       background: var(--surface);
+      font: var(--fw-regular) var(--fs-sm) var(--mono);
       color: var(--text-muted);
-      font-size: 12.5px;
-      font-weight: 500;
-      cursor: pointer;
-
-      &:hover { background: var(--surface-2); }
-
-      &.active {
-        background: var(--accent-soft);
-        border-color: var(--accent);
-        color: var(--accent);
-      }
     }
+    .q b { color: var(--text); font-weight: var(--fw-medium); }
+    .clear { display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+    .clear mat-icon { width: 14px; height: 14px; font-size: 14px; }
 
-    .table-card {
-      padding: 0;
-      overflow-x: auto;
-    }
+    .queue-sel { height: var(--control-h-sm); padding: 0 var(--sp-4); border: 1px solid var(--border-strong); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: var(--fw-regular) var(--fs-sm) var(--sans, inherit); }
+    .cnt { margin-left: var(--sp-3); font-family: var(--mono); color: var(--text-muted); }
+    .unassigned { color: var(--warn, var(--text-muted)); font-size: var(--fs-sm); }
 
-    .ticket-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
+    .num { font-family: var(--mono); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--accent); text-decoration: none; }
+    .num:hover { text-decoration: underline; }
+    .none { color: var(--text-faint); font-family: var(--mono); }
+    .inline-error { margin: 0; color: var(--critical); font-size: var(--fs-sm); }
 
-      th {
-        text-align: left;
-        padding: 12px 16px;
-        font-size: 11.5px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: var(--text-faint);
-        border-bottom: 1px solid var(--border);
-        white-space: nowrap;
-      }
-
-      td {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border);
-        color: var(--text);
-      }
-
-      tr:last-child td { border-bottom: none; }
-    }
-
-    .ticket-row {
-      cursor: pointer;
-
-      &:hover { background: var(--surface-2); }
-    }
-
-    .title-cell {
-      max-width: 360px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .muted { color: var(--text-faint); }
-
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
+    .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-5); }
     .page-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      width: var(--control-h-md);
+      height: var(--control-h-md);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-s);
       background: var(--surface);
       color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      justify-content: center;
       cursor: pointer;
-
-      &:hover:not(:disabled) { background: var(--surface-2); }
-      &:disabled { opacity: 0.4; cursor: default; }
     }
-
-    .page-info {
-      font-size: 12.5px;
-      color: var(--text-muted);
-    }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 56px 16px;
-      color: var(--text-faint);
-      font-size: 13px;
-
-      &.error { color: var(--critical); }
-    }
-
-    .empty-ic {
-      font-size: 36px;
-      width: 36px;
-      height: 36px;
-      color: inherit;
-    }
+    .page-btn:hover:not(:disabled) { background: var(--surface-2); }
+    .page-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
+    .page-info { font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-muted); }
   `]
 })
 export class TicketListComponent implements OnInit {
+  private ticketService = inject(TicketService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private catalog = inject(CatalogService);
+
+  private nowMs = Date.now();
+
   tickets = signal<TicketDto[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
   activeStatus = signal<TicketStatus | null>(null);
+  scope = signal<QueueScope>('MY_QUEUES');
+  queueId = signal<string | null>(null);
+  counts = signal<ConsoleCounts | null>(null);
+  queues = signal<QueueDto[]>([]);
+  scopes = SCOPES;
   page = signal(0);
   totalPages = signal(0);
 
+  /** Busca vinda do campo de comando do Shell (?q=…): filtra a página carregada. */
+  query = toSignal(this.route.queryParamMap.pipe(map(p => p.get('q')?.trim() || null)), { initialValue: null });
+
+  visible = computed(() => this.tickets());
+
   statusFilters = STATUS_FILTERS;
 
-  constructor(private ticketService: TicketService) {}
+  columns: NxColumn[] = [
+    { key: 'ticketNumber', header: 'Número', rowHeader: true },
+    { key: 'title', header: 'Título', maxWidth: '380px' },
+    { key: 'queue', header: 'Fila' },
+    { key: 'assignee', header: 'Responsável' },
+    { key: 'status', header: 'Status' },
+    { key: 'priority', header: 'Prioridade' },
+    { key: 'sla', header: 'SLA' },
+    { key: 'createdAt', header: 'Criado em', mono: true, muted: true },
+  ];
+
+  /** Nexus Rail: só urgência marca a linha. Crítico/estourado = vermelho; alta/em atenção = âmbar. */
+  rail = (t: TicketDto): 'warn' | 'crit' | null => {
+    if (t.status === 'RESOLVED' || t.status === 'CLOSED') return null;
+    const s = slaFromTicket(t, this.nowMs);
+    if (t.priority === 'CRITICAL' || s?.state === 'crit') return 'crit';
+    if (t.priority === 'HIGH' || s?.state === 'warn') return 'warn';
+    return null;
+  };
 
   ngOnInit(): void {
+    this.catalog.listQueues(false).subscribe({ next: q => this.queues.set(q), error: () => {} });
+    this.route.queryParamMap.subscribe(p => {
+      const sc = p.get('scope');
+      if (sc && SCOPES.some(x => x.value === sc)) this.scope.set(sc as QueueScope);
+      this.page.set(0);
+      this.load();
+    });
+  }
+
+  setScope(scope: QueueScope): void {
+    this.scope.set(scope);
+    this.page.set(0);
     this.load();
+  }
+
+  setQueue(id: string): void {
+    this.queueId.set(id || null);
+    this.page.set(0);
+    this.load();
+  }
+
+  queueName(id: string | null): string | null {
+    return id ? this.queues().find(q => q.id === id)?.name ?? null : null;
   }
 
   setStatus(status: TicketStatus | null): void {
     this.activeStatus.set(status);
     this.page.set(0);
     this.load();
+  }
+
+  clearQuery(): void {
+    this.router.navigate([], { queryParams: { q: null }, queryParamsHandling: 'merge' });
+  }
+
+  open(ticket: TicketDto): void {
+    this.router.navigate([ticket.id], { relativeTo: this.route });
   }
 
   prevPage(): void {
@@ -306,11 +296,32 @@ export class TicketListComponent implements OnInit {
     }
   }
 
+  tone = ticketStatusTone;
+  glyph = ticketStatusGlyph;
+
+  label(status: TicketStatus): string {
+    return STATUS_LABELS[status];
+  }
+
+  level(priority: string): PriorityLevel {
+    return priority.toLowerCase() as PriorityLevel;
+  }
+
+  sla(t: TicketDto) {
+    return slaFromTicket(t, this.nowMs);
+  }
+
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.ticketService.list({ status: this.activeStatus() ?? undefined, page: this.page() }).subscribe({
+    this.ticketService.counts().subscribe({ next: c => this.counts.set(c), error: () => {} });
+    this.ticketService.queueView({
+      scope: this.scope(), queueId: this.queueId() ?? undefined,
+      status: this.activeStatus() ?? undefined, q: this.query() ?? undefined, page: this.page(),
+    }).subscribe({
       next: res => {
+        // Um único "agora" por carga: o SLA não pode mudar entre as passagens de detecção de mudanças.
+        this.nowMs = Date.now();
         this.tickets.set(res.content);
         this.totalPages.set(res.totalPages);
         this.loading.set(false);
@@ -320,17 +331,5 @@ export class TicketListComponent implements OnInit {
         this.loading.set(false);
       }
     });
-  }
-
-  statusClass(status: TicketStatus): string {
-    return status.toLowerCase();
-  }
-
-  statusLabel(status: TicketStatus): string {
-    return STATUS_LABELS[status];
-  }
-
-  priorityLabel(priority: string): string {
-    return PRIORITY_LABELS[priority] ?? priority;
   }
 }

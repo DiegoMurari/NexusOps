@@ -1,36 +1,30 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
 import { PlatformService, FeatureFlagDto } from '../../../core/platform/platform.service';
+import { EmptyStateComponent, PageHeaderComponent, SkeletonComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-feature-flag-management',
   standalone: true,
-  imports: [CommonModule, MatIconModule],
+  imports: [CommonModule, EmptyStateComponent, PageHeaderComponent, SkeletonComponent],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Feature Flags</h1>
-    </div>
+    <nx-page-header heading="Feature flags" />
 
-    @if (loading()) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">hourglass_empty</mat-icon>
-        <p class="empty-text">Carregando feature flags…</p>
-      </div>
-    } @else if (error()) {
-      <div class="card empty-state error">
-        <mat-icon class="empty-ic">error_outline</mat-icon>
-        <p class="empty-text">{{ error() }}</p>
+    @if (error()) {
+      <nx-empty-state variant="error" [heading]="error()!" />
+    } @else if (loading()) {
+      <div class="flag-list" aria-busy="true">
+        <span class="sr-only" role="status">Carregando feature flags…</span>
+        @for (i of [0, 1, 2]; track i) {
+          <div class="card flag-row"><nx-skeleton width="40%" height="36px" /></div>
+        }
       </div>
     } @else if (flags().length === 0) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">flag</mat-icon>
-        <p class="empty-text">Nenhuma feature flag cadastrada</p>
-      </div>
+      <nx-empty-state heading="Nenhuma feature flag cadastrada" />
     } @else {
-      <div class="flag-list">
+      <ul class="flag-list">
         @for (flag of flags(); track flag.id) {
-          <div class="card flag-row">
+          <li class="card flag-row">
             <div class="flag-info">
               <div class="flag-name">{{ flag.name }}</div>
               <div class="flag-key mono">{{ flag.key }}</div>
@@ -40,130 +34,65 @@ import { PlatformService, FeatureFlagDto } from '../../../core/platform/platform
             </div>
             <div class="flag-actions">
               <span class="rollout mono">{{ flag.rolloutPercentage }}%</span>
+              <span class="flag-state">{{ flag.enabled ? 'Ativa' : 'Inativa' }}</span>
               <button
+                type="button"
                 class="toggle"
-                [class.on]="flag.enabled"
+                role="switch"
+                [attr.aria-checked]="flag.enabled"
+                [attr.aria-label]="flag.name"
                 [disabled]="toggling() === flag.id"
                 (click)="toggle(flag)"
-                [attr.aria-label]="flag.enabled ? 'Desativar' : 'Ativar'"
               >
                 <span class="toggle-thumb"></span>
               </button>
             </div>
-          </div>
+          </li>
         }
-      </div>
+      </ul>
     }
   `,
   styles: [`
     :host { display: block; }
 
-    .page-header { margin-bottom: 20px; }
-
-    .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .flag-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .flag-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .flag-name {
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .flag-key {
-      font-size: 11.5px;
-      color: var(--text-faint);
-      margin-top: 2px;
-    }
-
-    .flag-desc {
-      font-size: 12.5px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .flag-actions {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex: none;
-    }
-
-    .rollout {
-      font-size: 12px;
-      color: var(--text-faint);
-      min-width: 36px;
-      text-align: right;
-    }
+    .flag-list { display: flex; flex-direction: column; gap: var(--sp-4); margin: 0; padding: 0; list-style: none; }
+    .flag-row { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-6); }
+    .flag-name { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
+    .flag-key { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-1); }
+    .flag-desc { font-size: var(--fs-base); color: var(--text-muted); margin-top: var(--sp-2); max-width: 72ch; }
+    .flag-actions { display: flex; align-items: center; gap: var(--sp-5); flex: none; }
+    .rollout { font-size: var(--fs-sm); color: var(--text-muted); min-width: 36px; text-align: right; }
+    .flag-state { font-size: var(--fs-sm); color: var(--text); min-width: 44px; }
 
     .toggle {
       position: relative;
-      width: 40px;
-      height: 22px;
-      border-radius: 999px;
-      border: none;
+      width: 36px;
+      height: 20px;
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-s);
       background: var(--surface-3);
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 
-      &.on { background: var(--success); }
-      &:disabled { opacity: 0.5; cursor: default; }
+      &[aria-checked='true'] { background: var(--accent); border-color: var(--accent); }
+      &:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
     }
 
     .toggle-thumb {
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #fff;
-      transition: transform 0.15s ease;
+      width: 14px;
+      height: 14px;
+      border-radius: var(--radius-xs);
+      background: var(--text-muted);
+      transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
     }
 
-    .toggle.on .toggle-thumb {
-      transform: translateX(18px);
-    }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 64px 24px;
-      text-align: center;
-
-      &.error { color: var(--critical); }
-    }
-
-    .empty-ic {
-      font-size: 40px;
-      width: 40px;
-      height: 40px;
-      color: inherit;
-    }
-
-    .empty-text {
-      margin: 0;
-      color: var(--text-muted);
-      font-size: 13.5px;
+    .toggle[aria-checked='true'] .toggle-thumb {
+      transform: translateX(16px);
+      background: var(--on-accent);
     }
   `]
 })

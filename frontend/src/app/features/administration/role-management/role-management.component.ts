@@ -3,6 +3,10 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { RoleService } from '../../../core/iam/role.service';
 import type { PermissionDto, RoleDto } from '../../../core/iam/role.service';
+import {
+  ButtonComponent, DataTableComponent, EmptyStateComponent, NoticeComponent, NxCellDirective, NxColumn,
+  PageHeaderComponent, StatusBadgeComponent,
+} from '../../../shared/components';
 
 interface PermissionGroup {
   category: string;
@@ -12,20 +16,19 @@ interface PermissionGroup {
 @Component({
   selector: 'app-role-management',
   standalone: true,
-  imports: [CommonModule, MatIconModule],
+  imports: [
+    CommonModule, MatIconModule, ButtonComponent, DataTableComponent, EmptyStateComponent, NoticeComponent,
+    NxCellDirective, PageHeaderComponent, StatusBadgeComponent,
+  ],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Gerenciamento de Papéis</h1>
-      <button class="btn-primary" (click)="openCreate()">
+    <nx-page-header heading="Gerenciamento de papéis">
+      <button nxButton variant="primary" (click)="openCreate()">
         <mat-icon>add</mat-icon>
-        <span>Novo papel</span>
+        Novo papel
       </button>
-    </div>
+    </nx-page-header>
 
-    <div class="notice">
-      <mat-icon>info</mat-icon>
-      <span>Papéis do sistema são somente leitura. Em papéis personalizados você só pode conceder permissões que você mesmo possui.</span>
-    </div>
+    <nx-notice tone="info">Papéis do sistema são somente leitura. Em papéis personalizados você só pode conceder permissões que você mesmo possui.</nx-notice>
 
     @if (showForm()) {
       <form class="card form-card" (submit)="submit($event)">
@@ -61,114 +64,62 @@ interface PermissionGroup {
           }
         </div>
 
-        @if (formError()) { <p class="inline-error">{{ formError() }}</p> }
+        @if (formError()) { <p class="inline-error" role="alert">{{ formError() }}</p> }
         <div class="form-actions">
-          <button class="btn-secondary" type="button" (click)="showForm.set(false)">{{ readOnly() ? 'Fechar' : 'Cancelar' }}</button>
+          <button nxButton type="button" (click)="showForm.set(false)">{{ readOnly() ? 'Fechar' : 'Cancelar' }}</button>
           @if (!readOnly()) {
-            <button class="btn-primary" type="submit" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar' }}</button>
+            <button nxButton variant="primary" type="submit" [loading]="saving()" [disabled]="saving()">{{ saving() ? 'Salvando…' : 'Salvar' }}</button>
           }
         </div>
       </form>
     }
 
-    @if (loading()) {
-      <div class="card empty-state"><mat-icon class="empty-ic">hourglass_empty</mat-icon><p>Carregando papéis…</p></div>
-    } @else if (error()) {
-      <div class="card empty-state error"><mat-icon class="empty-ic">error_outline</mat-icon><p>{{ error() }}</p></div>
+    @if (actionError()) { <nx-notice tone="critical">{{ actionError() }}</nx-notice> }
+
+    @if (error()) {
+      <nx-empty-state variant="error" [heading]="error()!" />
     } @else {
-      <div class="card table-card">
-        <table class="role-table">
-          <thead>
-            <tr><th>Papel</th><th>Descrição</th><th>Tipo</th><th>Permissões</th><th></th></tr>
-          </thead>
-          <tbody>
-            @for (r of roles(); track r.id) {
-              <tr>
-                <td class="mono title-cell">{{ r.name }}</td>
-                <td class="muted">{{ r.description || '—' }}</td>
-                <td><span class="status-tag" [class.on]="!r.isSystem">{{ r.isSystem ? 'Sistema' : 'Personalizado' }}</span></td>
-                <td class="muted">{{ r.permissions.length }}</td>
-                <td class="actions">
-                  <button class="icon-btn" [title]="r.isSystem ? 'Ver' : 'Editar'" (click)="open(r)">
-                    <mat-icon>{{ r.isSystem ? 'visibility' : 'edit' }}</mat-icon>
-                  </button>
-                  @if (!r.isSystem) {
-                    <button class="icon-btn danger" title="Excluir" (click)="remove(r)"><mat-icon>delete_outline</mat-icon></button>
-                  }
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+      <nx-data-table caption="Papéis de acesso" [columns]="columns" [rows]="roles()" [loading]="loading()" emptyTitle="Nenhum papel encontrado">
+        <ng-template nxCell="description" let-r>{{ r.description || '—' }}</ng-template>
+        <ng-template nxCell="type" let-r>
+          <nx-status-badge [tone]="r.isSystem ? 'neutral' : 'info'">{{ r.isSystem ? 'Sistema' : 'Personalizado' }}</nx-status-badge>
+        </ng-template>
+        <ng-template nxCell="permissions" let-r>{{ r.permissions.length }}</ng-template>
+        <ng-template nxCell="actions" let-r>
+          <button nxButton variant="icon" size="sm" type="button"
+                  [attr.aria-label]="(r.isSystem ? 'Ver ' : 'Editar ') + r.name" [title]="r.isSystem ? 'Ver' : 'Editar'" (click)="open(r)">
+            <mat-icon>{{ r.isSystem ? 'visibility' : 'edit' }}</mat-icon>
+          </button>
+          @if (!r.isSystem) {
+            <button nxButton variant="icon-danger" size="sm" type="button" [attr.aria-label]="'Excluir ' + r.name" title="Excluir" (click)="remove(r)">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          }
+        </ng-template>
+      </nx-data-table>
     }
-    @if (actionError()) { <p class="inline-error">{{ actionError() }}</p> }
   `,
   styles: [`
     :host { display: block; }
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .page-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text); }
-    .notice {
-      display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 16px; border-radius: var(--radius-s);
-      background: var(--warning-soft); color: var(--warning); font-size: 12.5px;
-      mat-icon { font-size: 18px; width: 18px; height: 18px; flex: none; }
-    }
-    .btn-primary, .btn-secondary {
-      display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 18px;
-      border-radius: var(--radius-s); font-weight: 500; font-size: 13px; text-decoration: none; cursor: pointer;
-      mat-icon { font-size: 18px; width: 18px; height: 18px; }
-    }
-    .btn-primary { background: var(--accent); color: #fff; border: none; &:hover:not(:disabled) { filter: brightness(1.08); } &:disabled { opacity: 0.5; cursor: default; } }
-    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); &:hover { background: var(--surface-2); } }
-    .form-card { padding: 20px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 16px; }
-    .form-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-    .field { display: flex; flex-direction: column; gap: 6px; }
-    .label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
-    .input {
-      min-height: 36px; padding: 6px 12px; border-radius: var(--radius-s); border: 1px solid var(--border);
-      background: var(--surface-2); color: var(--text); font-size: 13px; font-family: inherit; outline: none;
-      &:focus { border-color: var(--accent); }
-      &:disabled { opacity: 0.7; }
-    }
-    .perm-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; max-height: 340px; overflow-y: auto; }
-    .perm-group { border: 1px solid var(--border); border-radius: var(--radius-s); padding: 8px 12px; margin: 0; min-width: 0;
-      legend { font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-faint); padding: 0 6px; } }
-    .perm { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--text); cursor: pointer; }
-    .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
-    .table-card { padding: 0; overflow-x: auto; }
-    .role-table {
-      width: 100%; border-collapse: collapse; font-size: 13px;
-      th { text-align: left; padding: 12px 16px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em;
-           text-transform: uppercase; color: var(--text-faint); border-bottom: 1px solid var(--border); white-space: nowrap; }
-      td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--text); }
-      tr:last-child td { border-bottom: none; }
-    }
-    .title-cell { white-space: nowrap; }
-    .muted { color: var(--text-faint); }
-    .actions { text-align: right; white-space: nowrap; }
-    .icon-btn {
-      width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface);
-      color: var(--text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px;
-      mat-icon { font-size: 18px; width: 18px; height: 18px; }
-      &:hover { background: var(--surface-2); }
-      &.danger:hover { color: var(--critical); background: var(--critical-soft); }
-    }
-    .status-tag {
-      display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 999px;
-      font-size: 11.5px; font-weight: 600; background: var(--surface-2); color: var(--text-muted);
-      &.on { background: var(--success-soft); color: var(--success); }
-    }
-    .inline-error { color: var(--critical); font-size: 13px; margin: 8px 0 0; }
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-      padding: 48px 16px; color: var(--text-faint); font-size: 13px;
-      &.error { color: var(--critical); }
-    }
-    .empty-ic { font-size: 36px; width: 36px; height: 36px; color: inherit; }
+    .form-card { padding: var(--sp-7); margin-bottom: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-6); }
+    .form-title { margin: 0; font-size: var(--fs-lg); line-height: 24px; font-weight: var(--fw-semibold); color: var(--text); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-6); }
+    .inline-error { margin: 0; }
+    .perm-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--sp-5); max-height: 340px; overflow-y: auto; }
+    .perm-group { border: 1px solid var(--border); border-radius: var(--radius-s); padding: var(--sp-4) var(--sp-5); margin: 0; min-width: 0;
+      legend { font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); padding: 0 var(--sp-3); } }
+    .perm { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-2) 0; font-size: var(--fs-sm); color: var(--text); cursor: pointer; }
   `]
 })
 export class RoleManagementComponent implements OnInit {
+  readonly columns: NxColumn[] = [
+    { key: 'name', header: 'Papel', rowHeader: true, mono: true },
+    { key: 'description', header: 'Descrição', muted: true },
+    { key: 'type', header: 'Tipo' },
+    { key: 'permissions', header: 'Permissões', muted: true },
+    { key: 'actions', header: 'Ações', align: 'end', hideHeader: true },
+  ];
+
   roles = signal<RoleDto[]>([]);
   permissions = signal<PermissionDto[]>([]);
   loading = signal(true);

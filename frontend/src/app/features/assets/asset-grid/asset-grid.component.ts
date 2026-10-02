@@ -1,8 +1,11 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { AssetService, AssetDto, AssetType, LifecycleStatus } from '../../../core/asset/asset.service';
+import {
+  DataTableComponent, NxCellDirective, NxColumn, StatusBadgeComponent, StatusGlyph, Tone,
+} from '../../../shared/components';
 
 const TYPE_LABELS: Record<AssetType, string> = {
   HARDWARE: 'Hardware',
@@ -24,6 +27,26 @@ const STATUS_LABELS: Record<LifecycleStatus, string> = {
   STOLEN: 'Roubado',
 };
 
+const STATUS_TONE: Record<LifecycleStatus, Tone> = {
+  PROCURED: 'info',
+  DEPLOYED: 'success',
+  MAINTENANCE: 'warning',
+  RETIRED: 'neutral',
+  DISPOSED: 'neutral',
+  LOST: 'critical',
+  STOLEN: 'critical',
+};
+
+const STATUS_GLYPH: Record<LifecycleStatus, StatusGlyph> = {
+  PROCURED: 'open',
+  DEPLOYED: 'done',
+  MAINTENANCE: 'hold',
+  RETIRED: 'closed',
+  DISPOSED: 'closed',
+  LOST: 'reopened',
+  STOLEN: 'reopened',
+};
+
 const STATUS_FILTERS: { value: LifecycleStatus | null; label: string }[] = [
   { value: null, label: 'Todos' },
   { value: 'PROCURED', label: 'Adquirido' },
@@ -36,292 +59,102 @@ const STATUS_FILTERS: { value: LifecycleStatus | null; label: string }[] = [
 @Component({
   selector: 'app-asset-grid',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule],
+  imports: [DatePipe, RouterLink, MatIconModule, DataTableComponent, NxCellDirective, StatusBadgeComponent],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Assets</h1>
-      <a class="btn-primary" routerLink="new">
-        <mat-icon>add</mat-icon>
-        <span>Novo Asset</span>
-      </a>
-    </div>
+    <header class="head">
+      <h1>Ativos</h1>
+      <a class="nx-verb primary" routerLink="new"><mat-icon aria-hidden="true">add</mat-icon>Novo ativo</a>
+    </header>
 
     <div class="toolbar">
-      <div class="filters">
+      <div class="seg" role="group" aria-label="Filtrar por ciclo de vida">
         @for (f of statusFilters; track f.label) {
-          <button
-            class="filter-chip"
-            [class.active]="activeStatus() === f.value"
-            (click)="setStatus(f.value)"
-          >{{ f.label }}</button>
+          <button type="button" [attr.aria-pressed]="activeStatus() === f.value" (click)="setStatus(f.value)">{{ f.label }}</button>
         }
       </div>
-      <input
-        class="search-input"
-        type="text"
-        placeholder="Buscar por nome, tag ou nº de série…"
-        [value]="searchTerm()"
-        (input)="onSearchInput($event)"
-      />
+      <label class="sr-only" for="asset-search">Buscar ativos</label>
+      <input id="asset-search" class="search" type="search" placeholder="Buscar por nome, tag ou nº de série…"
+        [value]="searchTerm()" (input)="onSearchInput($event)" />
     </div>
 
-    @if (loading()) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">hourglass_empty</mat-icon>
-        <p>Carregando assets…</p>
-      </div>
-    } @else if (error()) {
-      <div class="card empty-state error">
-        <mat-icon class="empty-ic">error_outline</mat-icon>
-        <p>{{ error() }}</p>
-      </div>
-    } @else if (assets().length === 0) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">dns</mat-icon>
-        <p>Nenhum asset encontrado</p>
-      </div>
-    } @else {
-      <div class="card table-card">
-        <table class="asset-table">
-          <thead>
-            <tr>
-              <th>Tag</th>
-              <th>Nome</th>
-              <th>Tipo</th>
-              <th>Status</th>
-              <th>Fabricante</th>
-              <th>Nº de série</th>
-              <th>Criado em</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (asset of assets(); track asset.id) {
-              <tr [routerLink]="[asset.id]" class="asset-row">
-                <td class="mono">{{ asset.assetTag }}</td>
-                <td class="title-cell">{{ asset.name }}</td>
-                <td>{{ typeLabel(asset.type) }}</td>
-                <td>
-                  <span class="status-tag" [class]="asset.lifecycleStatus.toLowerCase()">{{ statusLabel(asset.lifecycleStatus) }}</span>
-                </td>
-                <td class="muted">{{ asset.manufacturer || '—' }}</td>
-                <td class="mono muted">{{ asset.serialNumber || '—' }}</td>
-                <td class="mono muted">{{ asset.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+    @if (error()) {
+      <p class="inline-error" role="alert">{{ error() }}</p>
+    }
 
-      <div class="pagination">
-        <button class="page-btn" [disabled]="page() === 0" (click)="prevPage()">
-          <mat-icon>chevron_left</mat-icon>
+    <nx-data-table
+      caption="Ativos"
+      [columns]="columns"
+      [rows]="assets()"
+      [loading]="loading()"
+      [rowClickable]="true"
+      [rowRail]="rail"
+      emptyTitle="Nenhum ativo encontrado"
+      (rowActivate)="open($any($event))"
+    >
+      <ng-template nxCell="assetTag" let-a>
+        <a class="tag" [routerLink]="[a.id]">{{ a.assetTag }}</a>
+      </ng-template>
+      <ng-template nxCell="type" let-a>{{ typeLabel(a.type) }}</ng-template>
+      <ng-template nxCell="lifecycleStatus" let-a>
+        <nx-status-badge [tone]="tone(a.lifecycleStatus)" [glyph]="glyph(a.lifecycleStatus)">{{ statusLabel(a.lifecycleStatus) }}</nx-status-badge>
+      </ng-template>
+      <ng-template nxCell="createdAt" let-a>{{ a.createdAt | date:'dd/MM/yyyy HH:mm' }}</ng-template>
+    </nx-data-table>
+
+    @if (totalPages() > 1) {
+      <nav class="pagination" aria-label="Paginação">
+        <button type="button" class="page-btn" [disabled]="page() === 0" (click)="prevPage()" aria-label="Página anterior">
+          <mat-icon aria-hidden="true">chevron_left</mat-icon>
         </button>
-        <span class="page-info">Página {{ page() + 1 }} de {{ totalPages() || 1 }}</span>
-        <button class="page-btn" [disabled]="page() + 1 >= totalPages()" (click)="nextPage()">
-          <mat-icon>chevron_right</mat-icon>
+        <span class="page-info">Página {{ page() + 1 }} de {{ totalPages() }}</span>
+        <button type="button" class="page-btn" [disabled]="page() + 1 >= totalPages()" (click)="nextPage()" aria-label="Próxima página">
+          <mat-icon aria-hidden="true">chevron_right</mat-icon>
         </button>
-      </div>
+      </nav>
     }
   `,
   styles: [`
-    :host { display: block; }
+    :host { display: grid; gap: var(--sp-6); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6); }
+    h1 { margin: 0; font-size: var(--fs-xl); line-height: 28px; font-weight: var(--fw-semibold); }
+    .nx-verb mat-icon { width: 16px; height: 16px; font-size: 16px; }
 
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-5); }
+    .search {
+      height: var(--control-h-md);
+      min-width: 280px;
+      padding: 0 var(--sp-5);
+      font: var(--fw-regular) var(--fs-base) var(--sans);
       color: var(--text);
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 18px;
-      border-radius: var(--radius-s);
-      background: var(--accent);
-      color: #fff;
-      font-weight: 500;
-      font-size: 13px;
-      text-decoration: none;
-
-      mat-icon { font-size: 18px; width: 18px; height: 18px; }
-
-      &:hover { filter: brightness(1.08); }
-    }
-
-    .toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .filter-chip {
-      height: 30px;
-      padding: 0 14px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
       background: var(--surface);
-      color: var(--text-muted);
-      font-size: 12.5px;
-      font-weight: 500;
-      cursor: pointer;
-
-      &:hover { background: var(--surface-2); }
-
-      &.active {
-        background: var(--accent-soft);
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-    }
-
-    .search-input {
-      height: 34px;
-      min-width: 260px;
-      padding: 0 12px;
+      border: 1px solid var(--border-strong);
       border-radius: var(--radius-s);
-      border: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text);
-      font-size: 13px;
-      outline: none;
-
-      &:focus { border-color: var(--accent); }
-      &::placeholder { color: var(--text-faint); }
     }
+    .search::placeholder { color: var(--text-faint); }
+    .search:focus-visible { outline: var(--focus-ring); outline-offset: 1px; border-color: var(--accent); }
 
-    .table-card {
-      padding: 0;
-      overflow-x: auto;
-    }
+    .tag { font-family: var(--mono); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--accent); text-decoration: none; }
+    .tag:hover { text-decoration: underline; }
+    .inline-error { margin: 0; color: var(--critical); font-size: var(--fs-sm); }
 
-    .asset-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-
-      th {
-        text-align: left;
-        padding: 12px 16px;
-        font-size: 11.5px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: var(--text-faint);
-        border-bottom: 1px solid var(--border);
-        white-space: nowrap;
-      }
-
-      td {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border);
-        color: var(--text);
-      }
-
-      tr:last-child td { border-bottom: none; }
-    }
-
-    .asset-row {
-      cursor: pointer;
-
-      &:hover { background: var(--surface-2); }
-    }
-
-    .title-cell {
-      max-width: 320px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .status-tag {
-      display: inline-flex;
-      align-items: center;
-      height: 22px;
-      padding: 0 10px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 600;
-      background: var(--surface-2);
-      color: var(--text-muted);
-
-      &.deployed { background: var(--success-soft); color: var(--success); }
-      &.procured { background: var(--accent-soft); color: var(--accent); }
-      &.maintenance { background: var(--warning-soft); color: var(--warning); }
-      &.retired, &.disposed, &.lost, &.stolen { background: var(--critical-soft); color: var(--critical); }
-    }
-
-    .muted { color: var(--text-faint); }
-
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
+    .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-5); }
     .page-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-
-      &:hover:not(:disabled) { background: var(--surface-2); }
-      &:disabled { opacity: 0.4; cursor: default; }
+      display: grid; place-items: center;
+      width: var(--control-h-md); height: var(--control-h-md);
+      border: 1px solid var(--border-strong); border-radius: var(--radius-s);
+      background: var(--surface); color: var(--text-muted); cursor: pointer;
     }
-
-    .page-info {
-      font-size: 12.5px;
-      color: var(--text-muted);
-    }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 56px 16px;
-      color: var(--text-faint);
-      font-size: 13px;
-
-      &.error { color: var(--critical); }
-    }
-
-    .empty-ic {
-      font-size: 36px;
-      width: 36px;
-      height: 36px;
-      color: inherit;
-    }
+    .page-btn:hover:not(:disabled) { background: var(--surface-2); }
+    .page-btn:disabled { opacity: var(--disabled-opacity); cursor: default; }
+    .page-info { font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-muted); }
   `]
 })
 export class AssetGridComponent implements OnInit {
+  private assetService = inject(AssetService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
   assets = signal<AssetDto[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
@@ -333,7 +166,22 @@ export class AssetGridComponent implements OnInit {
   statusFilters = STATUS_FILTERS;
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private assetService: AssetService) {}
+  columns: NxColumn[] = [
+    { key: 'assetTag', header: 'Tag', rowHeader: true },
+    { key: 'name', header: 'Nome', maxWidth: '320px' },
+    { key: 'type', header: 'Tipo' },
+    { key: 'lifecycleStatus', header: 'Ciclo de vida' },
+    { key: 'manufacturer', header: 'Fabricante', muted: true },
+    { key: 'serialNumber', header: 'Nº de série', mono: true, muted: true },
+    { key: 'createdAt', header: 'Criado em', mono: true, muted: true },
+  ];
+
+  /** Nexus Rail: só o que exige atenção marca a linha (manutenção = âmbar; perdido/roubado = vermelho). */
+  rail = (a: AssetDto): 'warn' | 'crit' | null => {
+    if (a.lifecycleStatus === 'LOST' || a.lifecycleStatus === 'STOLEN') return 'crit';
+    if (a.lifecycleStatus === 'MAINTENANCE') return 'warn';
+    return null;
+  };
 
   ngOnInit(): void {
     this.load();
@@ -353,6 +201,10 @@ export class AssetGridComponent implements OnInit {
       this.page.set(0);
       this.load();
     }, 350);
+  }
+
+  open(asset: AssetDto): void {
+    this.router.navigate([asset.id], { relativeTo: this.route });
   }
 
   prevPage(): void {
@@ -383,7 +235,7 @@ export class AssetGridComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Não foi possível carregar os assets.');
+        this.error.set('Não foi possível carregar os ativos.');
         this.loading.set(false);
       }
     });
@@ -395,5 +247,13 @@ export class AssetGridComponent implements OnInit {
 
   statusLabel(status: LifecycleStatus): string {
     return STATUS_LABELS[status] ?? status;
+  }
+
+  tone(status: LifecycleStatus): Tone {
+    return STATUS_TONE[status] ?? 'neutral';
+  }
+
+  glyph(status: LifecycleStatus): StatusGlyph {
+    return STATUS_GLYPH[status] ?? 'open';
   }
 }

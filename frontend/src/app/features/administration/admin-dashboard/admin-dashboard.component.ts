@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { PageHeaderComponent } from '../../../shared/components';
 
 interface AdminSection {
   label: string;
@@ -13,21 +14,19 @@ interface AdminSection {
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule],
+  imports: [CommonModule, RouterLink, MatIconModule, PageHeaderComponent],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Painel de Administração</h1>
-    </div>
+    <nx-page-header heading="Painel de administração" />
 
     <div class="nav-cards">
       @for (section of sections; track section.route) {
         <a class="card nav-card" [routerLink]="section.route">
-          <mat-icon class="nav-ic">{{ section.icon }}</mat-icon>
+          <mat-icon class="nav-ic" aria-hidden="true">{{ section.icon }}</mat-icon>
           <div>
             <div class="nav-title">{{ section.label }}</div>
             <div class="nav-desc">{{ section.desc }}</div>
           </div>
-          <mat-icon class="nav-arrow">chevron_right</mat-icon>
+          <mat-icon class="nav-arrow" aria-hidden="true">chevron_right</mat-icon>
         </a>
       }
     </div>
@@ -35,60 +34,42 @@ interface AdminSection {
   styles: [`
     :host { display: block; }
 
-    .page-header { margin-bottom: 20px; }
-
-    .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
     .nav-cards {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 10px;
+      gap: var(--sp-5);
     }
 
     .nav-card {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: var(--sp-5);
       text-decoration: none;
       cursor: pointer;
+      transition: background-color var(--dur-fast) var(--ease);
 
-      &:hover { background: var(--surface-3); }
+      &:hover { background: var(--surface-2); }
     }
 
     .nav-ic {
       flex: none;
-      color: var(--accent);
+      color: var(--text-muted);
       font-size: 24px;
       width: 24px;
       height: 24px;
     }
 
-    .nav-title {
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .nav-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .nav-arrow {
-      margin-left: auto;
-      color: var(--text-faint);
-    }
+    .nav-title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
+    .nav-desc { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-1); }
+    .nav-arrow { margin-left: auto; color: var(--text-muted); }
   `]
 })
 export class AdminDashboardComponent {
   sections: AdminSection[] = [
     { label: 'Usuários', desc: 'Gerenciar contas e permissões', icon: 'group', route: 'users' },
+    { label: 'Filas', desc: 'Equipes de atendimento e seus membros', icon: 'groups', route: 'queues' },
+    { label: 'Catálogo de serviços', desc: 'Áreas e tópicos do Portal, com fila e SLA padrão', icon: 'category', route: 'catalog' },
+    { label: 'Roteamento', desc: 'Regras que decidem fila, prioridade e responsável, com simulador', icon: 'alt_route', route: 'routing' },
     { label: 'Tenants', desc: 'Organizações da plataforma', icon: 'apartment', route: 'tenants' },
     { label: 'Funções', desc: 'Papéis e permissões do sistema', icon: 'badge', route: 'roles' },
     { label: 'Feature Flags', desc: 'Controlar funcionalidades em rollout', icon: 'flag', route: 'feature-flags' },

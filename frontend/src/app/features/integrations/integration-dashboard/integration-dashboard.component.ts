@@ -3,28 +3,24 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { IntegrationOverview, IntegrationService } from '../../../core/integrations/integration.service';
+import { NoticeComponent, PageHeaderComponent } from '../../../shared/components';
 
 @Component({
   selector: 'app-integration-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule],
+  imports: [CommonModule, RouterLink, MatIconModule, NoticeComponent, PageHeaderComponent],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Integrações</h1>
-    </div>
+    <nx-page-header heading="Integrações" />
 
-    <div class="notice">
-      <mat-icon>info</mat-icon>
-      <span>Webhooks e conexões são cadastrados e validados, mas o envio de eventos e a sincronização com serviços externos ainda não estão disponíveis.</span>
-    </div>
+    <nx-notice tone="warning">Webhooks e conexões são cadastrados e validados, mas o envio de eventos e a sincronização com serviços externos ainda não estão disponíveis.</nx-notice>
 
     @if (error()) {
-      <p class="inline-error">{{ error() }}</p>
+      <nx-notice tone="critical">{{ error() }}</nx-notice>
     }
 
     <div class="cards">
       <a class="card nav-card" routerLink="/integrations/webhooks">
-        <mat-icon class="ic">webhook</mat-icon>
+        <mat-icon class="ic" aria-hidden="true">webhook</mat-icon>
         <div class="body">
           <h2 class="card-title">Webhooks</h2>
           <p class="card-text">Endpoints HTTPS que receberão eventos do NexusOps.</p>
@@ -32,7 +28,7 @@ import { IntegrationOverview, IntegrationService } from '../../../core/integrati
         </div>
       </a>
       <a class="card nav-card" routerLink="/integrations/jira">
-        <mat-icon class="ic">bug_report</mat-icon>
+        <mat-icon class="ic" aria-hidden="true">bug_report</mat-icon>
         <div class="body">
           <h2 class="card-title">Jira</h2>
           <p class="card-text">Configuração da conexão com projetos Jira.</p>
@@ -40,7 +36,7 @@ import { IntegrationOverview, IntegrationService } from '../../../core/integrati
         </div>
       </a>
       <a class="card nav-card" routerLink="/integrations/slack">
-        <mat-icon class="ic">forum</mat-icon>
+        <mat-icon class="ic" aria-hidden="true">forum</mat-icon>
         <div class="body">
           <h2 class="card-title">Slack</h2>
           <p class="card-text">Configuração da conexão com canais do Slack.</p>
@@ -51,23 +47,16 @@ import { IntegrationOverview, IntegrationService } from '../../../core/integrati
   `,
   styles: [`
     :host { display: block; }
-    .page-header { margin-bottom: 16px; }
-    .page-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text); }
-    .notice {
-      display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 16px; border-radius: var(--radius-s);
-      background: var(--warning-soft); color: var(--warning); font-size: 12.5px;
-      mat-icon { font-size: 18px; width: 18px; height: 18px; flex: none; }
-    }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-6); }
     .nav-card {
-      display: flex; gap: 14px; padding: 20px; text-decoration: none; color: inherit;
+      display: flex; gap: var(--sp-5); padding: var(--sp-7); text-decoration: none; color: inherit;
+      transition: background-color var(--dur-fast) var(--ease);
       &:hover { background: var(--surface-2); }
     }
-    .ic { font-size: 28px; width: 28px; height: 28px; color: var(--accent); flex: none; }
-    .card-title { margin: 0 0 4px; font-size: 15px; font-weight: 600; color: var(--text); }
-    .card-text { margin: 0 0 8px; font-size: 13px; color: var(--text-muted); }
-    .count { font-size: 12px; color: var(--text-faint); }
-    .inline-error { color: var(--critical); font-size: 13px; margin: 0 0 12px; }
+    .ic { width: 24px; height: 24px; font-size: 24px; color: var(--text-muted); flex: none; }
+    .card-title { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); line-height: 24px; font-weight: var(--fw-semibold); color: var(--text); }
+    .card-text { margin: 0 0 var(--sp-4); font-size: var(--fs-base); color: var(--text-muted); }
+    .count { font-size: var(--fs-sm); color: var(--text-muted); }
   `]
 })
 export class IntegrationDashboardComponent implements OnInit {

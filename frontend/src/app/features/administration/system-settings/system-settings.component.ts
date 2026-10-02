@@ -1,144 +1,42 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
 import { PlatformService, SystemSettingDto } from '../../../core/platform/platform.service';
+import {
+  DataTableComponent, EmptyStateComponent, NxCellDirective, NxColumn, PageHeaderComponent, StatusBadgeComponent,
+} from '../../../shared/components';
 
 @Component({
   selector: 'app-system-settings',
   standalone: true,
-  imports: [CommonModule, MatIconModule],
+  imports: [CommonModule, DataTableComponent, EmptyStateComponent, NxCellDirective, PageHeaderComponent, StatusBadgeComponent],
   template: `
-    <div class="page-header">
-      <h1 class="page-title">Configurações do Sistema</h1>
-    </div>
+    <nx-page-header heading="Configurações do sistema" />
 
-    @if (loading()) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">hourglass_empty</mat-icon>
-        <p class="empty-text">Carregando configurações…</p>
-      </div>
-    } @else if (error()) {
-      <div class="card empty-state error">
-        <mat-icon class="empty-ic">error_outline</mat-icon>
-        <p class="empty-text">{{ error() }}</p>
-      </div>
-    } @else if (settings().length === 0) {
-      <div class="card empty-state">
-        <mat-icon class="empty-ic">settings</mat-icon>
-        <p class="empty-text">Nenhuma configuração cadastrada</p>
-      </div>
+    @if (error()) {
+      <nx-empty-state variant="error" [heading]="error()!" />
     } @else {
-      <div class="card table-card">
-        <table class="settings-table">
-          <thead>
-            <tr>
-              <th>Chave</th>
-              <th>Valor</th>
-              <th>Tipo</th>
-              <th>Categoria</th>
-              <th>Visibilidade</th>
-              <th>Atualizado em</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (s of settings(); track s.id) {
-              <tr>
-                <td class="mono">{{ s.settingKey }}</td>
-                <td class="mono value-cell">{{ s.value }}</td>
-                <td>{{ s.valueType }}</td>
-                <td>{{ s.category || '—' }}</td>
-                <td>
-                  <span class="status-tag" [class]="s.public ? 'resolved' : 'closed'">
-                    {{ s.public ? 'Pública' : 'Privada' }}
-                  </span>
-                </td>
-                <td class="mono muted">{{ s.updatedAt | date:'dd/MM/yyyy HH:mm' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
+      <nx-data-table caption="Configurações do sistema" [columns]="columns" [rows]="settings()" [loading]="loading()"
+                     emptyTitle="Nenhuma configuração cadastrada">
+        <ng-template nxCell="category" let-s>{{ s.category || '—' }}</ng-template>
+        <ng-template nxCell="public" let-s>
+          <nx-status-badge [tone]="s.public ? 'info' : 'neutral'">{{ s.public ? 'Pública' : 'Privada' }}</nx-status-badge>
+        </ng-template>
+        <ng-template nxCell="updatedAt" let-s>{{ s.updatedAt | date:'dd/MM/yyyy HH:mm' }}</ng-template>
+      </nx-data-table>
     }
   `,
-  styles: [`
-    :host { display: block; }
-
-    .page-header { margin-bottom: 20px; }
-
-    .page-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .table-card {
-      padding: 0;
-      overflow-x: auto;
-    }
-
-    .settings-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-
-      th {
-        text-align: left;
-        padding: 12px 16px;
-        font-size: 11.5px;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        text-transform: uppercase;
-        color: var(--text-faint);
-        border-bottom: 1px solid var(--border);
-        white-space: nowrap;
-      }
-
-      td {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border);
-        color: var(--text);
-      }
-
-      tr:last-child td { border-bottom: none; }
-    }
-
-    .value-cell {
-      max-width: 320px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .muted { color: var(--text-faint); }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 64px 24px;
-      text-align: center;
-
-      &.error { color: var(--critical); }
-    }
-
-    .empty-ic {
-      font-size: 40px;
-      width: 40px;
-      height: 40px;
-      color: inherit;
-    }
-
-    .empty-text {
-      margin: 0;
-      color: var(--text-muted);
-      font-size: 13.5px;
-    }
-  `]
+  styles: [`:host { display: block; }`]
 })
 export class SystemSettingsComponent implements OnInit {
+  readonly columns: NxColumn[] = [
+    { key: 'settingKey', header: 'Chave', rowHeader: true, mono: true },
+    { key: 'value', header: 'Valor', mono: true, maxWidth: '320px' },
+    { key: 'valueType', header: 'Tipo' },
+    { key: 'category', header: 'Categoria' },
+    { key: 'public', header: 'Visibilidade' },
+    { key: 'updatedAt', header: 'Atualizado em', mono: true, muted: true },
+  ];
+
   settings = signal<SystemSettingDto[]>([]);
   loading = signal(true);
   error = signal<string | null>(null);
