@@ -22,6 +22,10 @@ public interface TicketRepository extends JpaRepository<Ticket, String>,
 
     Optional<Ticket> findByTicketNumber(String ticketNumber);
 
+    Optional<Ticket> findByIdAndTenantId(String id, String tenantId);
+
+    List<Ticket> findByTenantIdAndIdIn(String tenantId, java.util.Collection<String> ids);
+
     List<Ticket> findByTenantId(String tenantId);
 
     List<Ticket> findByTenantIdAndStatus(String tenantId, Ticket.TicketStatus status);

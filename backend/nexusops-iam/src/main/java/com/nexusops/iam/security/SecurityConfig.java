@@ -75,6 +75,13 @@ public class SecurityConfig {
                         "{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Authentication required or token expired\"}"
                     );
                 })
+                .accessDeniedHandler((request, response, deniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write(
+                        "{\"status\":403,\"error\":\"Forbidden\",\"message\":\"You do not have permission to perform this action\"}"
+                    );
+                })
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/login", "/auth/refresh").permitAll()

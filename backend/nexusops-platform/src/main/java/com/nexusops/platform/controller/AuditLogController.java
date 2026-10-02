@@ -37,8 +37,10 @@ public class AuditLogController {
             @RequestParam(required = false) Instant since,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String resourceType,
-            @RequestParam(required = false) String userId) {
-        return ResponseEntity.ok(auditService.search(tenant(), action, resourceType, userId, since, cap(pageable)));
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) Instant until,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(auditService.search(tenant(), action, resourceType, userId, since, until, q, cap(pageable)));
     }
 
     @GetMapping("/{id}")
@@ -71,7 +73,7 @@ public class AuditLogController {
             @PathVariable String tenantId,
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @RequestParam(required = false) Instant since) {
-        return ResponseEntity.ok(auditService.search(tenantId, null, null, null, since, cap(pageable)));
+        return ResponseEntity.ok(auditService.search(tenantId, null, null, null, since, null, null, cap(pageable)));
     }
 
     private String tenant() {

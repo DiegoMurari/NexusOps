@@ -7,8 +7,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +40,18 @@ public class UserDirectoryService implements UserDirectory {
         return userRepository.findByEmailAndTenantId(email, tenantId)
             .filter(u -> u.getStatus() == User.UserStatus.ACTIVE)
             .map(UserDirectoryService::toRef);
+    }
+
+    @Override
+    public List<UserRef> searchActive(String tenantId, String query, int limit) {
+        if (tenantId == null || limit <= 0) {
+            return List.of();
+        }
+        String text = query == null ? "" : query.trim().toLowerCase();
+        String pattern = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return userRepository.searchActive(tenantId, pattern, PageRequest.of(0, Math.min(limit, 50))).stream()
+            .map(UserDirectoryService::toRef)
+            .toList();
     }
 
     @Override

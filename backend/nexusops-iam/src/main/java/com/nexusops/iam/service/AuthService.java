@@ -7,6 +7,7 @@ import com.nexusops.iam.dto.AuthRequest;
 import com.nexusops.iam.dto.AuthResponse;
 import com.nexusops.iam.dto.RefreshTokenRequest;
 import com.nexusops.iam.event.LoginAttemptedEvent;
+import com.nexusops.iam.event.SessionEndedEvent;
 import com.nexusops.iam.infrastructure.repository.RefreshTokenRepository;
 import com.nexusops.iam.infrastructure.repository.RoleRepository;
 import com.nexusops.iam.infrastructure.repository.UserRepository;
@@ -115,12 +116,16 @@ public class AuthService {
         }
         String jti = jwtTokenProvider.getJti(refreshToken);
         refreshTokenRepository.revokeByJti(jti, Instant.now());
+        userRepository.findByEmail(jwtTokenProvider.getUsername(refreshToken))
+            .ifPresent(user -> eventPublisher.publishEvent(
+                new SessionEndedEvent(user.getTenantId(), user.getEmail(), false)));
     }
 
     public void logoutAll(String username) {
         User user = userRepository.findByEmail(username)
             .orElseThrow(() -> new ResourceNotFoundException("User", username));
         refreshTokenRepository.revokeAllForUser(user.getId(), Instant.now());
+        eventPublisher.publishEvent(new SessionEndedEvent(user.getTenantId(), user.getEmail(), true));
     }
 
     private AuthResponse generateAuthResponse(User user) {

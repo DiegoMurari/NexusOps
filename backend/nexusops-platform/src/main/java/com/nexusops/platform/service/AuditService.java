@@ -21,6 +21,8 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AuditService {
 
+    private static final char ESCAPE = '\\';
+
     private final AuditLogRepository auditLogRepository;
     private final AuditLogMapper auditLogMapper;
 
@@ -37,7 +39,7 @@ public class AuditService {
 
     /** Filtered, paged listing; blank filters are ignored. */
     public Page<AuditLogDto> search(String tenantId, String action, String resourceType, String userId,
-                                    Instant since, Pageable pageable) {
+                                    Instant since, Instant until, String q, Pageable pageable) {
         Specification<AuditLog> spec = (root, query, cb) -> cb.equal(root.get("tenantId"), tenantId);
         if (hasText(action)) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("action"), action.trim()));
@@ -50,6 +52,17 @@ public class AuditService {
         }
         if (since != null) {
             spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), since));
+        }
+        if (until != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("createdAt"), until));
+        }
+        if (hasText(q)) {
+            String like = "%" + escapeLike(q.trim().toLowerCase()) + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                cb.like(cb.lower(root.get("eventType")), like, ESCAPE),
+                cb.like(cb.lower(root.get("userId")), like, ESCAPE),
+                cb.like(cb.lower(root.get("resourceType")), like, ESCAPE),
+                cb.like(cb.lower(root.get("resourceId")), like, ESCAPE)));
         }
         return auditLogRepository.findAll(spec, pageable).map(auditLogMapper::toDto);
     }
@@ -88,6 +101,11 @@ public class AuditService {
         return auditLogRepository.findByIdAndTenantId(id, tenantId)
             .map(auditLogMapper::toDto)
             .orElseThrow(() -> new ResourceNotFoundException("AuditLog", id));
+    }
+
+    /** Escapes LIKE wildcards so user text is matched literally. */
+    static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static boolean hasText(String value) {

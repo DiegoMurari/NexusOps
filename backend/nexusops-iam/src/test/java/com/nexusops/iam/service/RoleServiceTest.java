@@ -162,4 +162,38 @@ class RoleServiceTest {
 
         verify(roleRepository).delete(role);
     }
+
+    @Test
+    void assignPermission_refusesWhatTheCallerDoesNotHold() {
+        Role role = custom(TENANT);
+        when(roleRepository.findById(role.getId())).thenReturn(Optional.of(role));
+        when(permissionRepository.findByKeys(any())).thenReturn(List.of(permission("USER:DELETE:TENANT")));
+
+        assertThatThrownBy(() -> service.assignPermission(role.getId(), "USER:DELETE:TENANT", TENANT, CALLER))
+            .isInstanceOf(ValidationException.class);
+        verify(roleRepository, never()).save(any());
+    }
+
+    @Test
+    void assignAndRemovePermission_neverTouchSystemRoles() {
+        Role system = Role.builder().id(UUID.randomUUID()).name("ADMIN").isSystem(true)
+            .permissions(new HashSet<>(Set.of("TICKET:READ:TENANT"))).build();
+        when(roleRepository.findById(system.getId())).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> service.assignPermission(system.getId(), "TICKET:READ:TENANT", TENANT, CALLER))
+            .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> service.removePermission(system.getId(), "TICKET:READ:TENANT", TENANT))
+            .isInstanceOf(ValidationException.class);
+        verify(roleRepository, never()).save(any());
+    }
+
+    @Test
+    void removePermission_ofAnotherTenantsRole_isNotFound() {
+        Role foreign = custom("other-tenant");
+        when(roleRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        assertThatThrownBy(() -> service.removePermission(foreign.getId(), "TICKET:READ:TENANT", TENANT))
+            .isInstanceOf(ResourceNotFoundException.class);
+        verify(roleRepository, never()).save(any());
+    }
 }

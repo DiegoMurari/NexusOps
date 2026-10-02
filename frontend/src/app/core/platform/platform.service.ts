@@ -59,6 +59,7 @@ export interface AuditLogDto {
   resourceId: string | null;
   action: string | null;
   ipAddress: string | null;
+  userAgent: string | null;
   payload: string | null;
   createdAt: string;
 }
@@ -92,10 +93,13 @@ export class PlatformService {
     return this.http.get<SystemSettingDto[]>(`${this.base}/settings`);
   }
 
-  listAuditLogs(page = 0, size = 50, filters: { action?: string; resourceType?: string } = {}): Observable<PageResponse<AuditLogDto>> {
+  listAuditLogs(page = 0, size = 50, filters: { action?: string; resourceType?: string; q?: string; since?: string; until?: string } = {}): Observable<PageResponse<AuditLogDto>> {
     const params: Record<string, string> = { page: String(page), size: String(size) };
     if (filters.action) params['action'] = filters.action;
     if (filters.resourceType) params['resourceType'] = filters.resourceType;
+    if (filters.q) params['q'] = filters.q;
+    if (filters.since) params['since'] = filters.since;
+    if (filters.until) params['until'] = filters.until;
     return this.http.get<PageResponse<AuditLogDto>>(`${this.base}/audit-logs`, { params });
   }
 }

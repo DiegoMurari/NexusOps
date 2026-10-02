@@ -27,4 +27,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.status = 'ACTIVE'")
     java.util.List<User> findActiveByTenantId(@Param("tenantId") String tenantId);
+
+    /** {@code pattern} chega em minúsculas, já com os curingas do LIKE (escapados com barra invertida). */
+    @Query("SELECT u FROM User u WHERE u.tenantId = :tenantId AND u.status = 'ACTIVE' AND ("
+        + "LOWER(u.email) LIKE :pattern ESCAPE '\\' OR LOWER(u.firstName) LIKE :pattern ESCAPE '\\' "
+        + "OR LOWER(u.lastName) LIKE :pattern ESCAPE '\\') ORDER BY u.firstName, u.lastName, u.email")
+    java.util.List<User> searchActive(@Param("tenantId") String tenantId, @Param("pattern") String pattern,
+                                      org.springframework.data.domain.Pageable pageable);
 }

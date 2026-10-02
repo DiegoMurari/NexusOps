@@ -382,6 +382,14 @@ const OPEN_STATUSES = ['OPEN', 'IN_PROGRESS', 'WAITING', 'ON_HOLD', 'REOPENED'];
     }
 
     .actions { display: flex; align-items: center; gap: var(--sp-4); }
+
+    /* Telas estreitas: a busca global sai da barra e o caminho de navegação encolhe, sem estourar a largura. */
+    @media (max-width: 700px) {
+      .topbar { gap: var(--sp-4); padding: 0 var(--sp-4); }
+      .crumbs { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .cmd { display: none; }
+      .actions { margin-left: auto; flex: none; }
+    }
     .icon-btn {
       display: flex;
       align-items: center;
@@ -458,7 +466,8 @@ export class AppComponent {
 
   @ViewChild('cmd') private cmd?: ElementRef<HTMLInputElement>;
 
-  expanded = signal(true);
+  /** O menu começa recolhido em telas estreitas, para o conteúdo não ficar espremido. */
+  expanded = signal(typeof window === 'undefined' || window.innerWidth >= 900);
   private openCount = signal(0);
   private breachCount = signal(0);
 
