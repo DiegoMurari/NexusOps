@@ -24,8 +24,23 @@ public class Attachment implements TenantAware {
     @Column(name = "id", length = 36)
     private String id;
 
-    @Column(name = "ticket_id", nullable = false, length = 36)
+    /** Nulo enquanto o anexo está "preparado": enviado no formulário de abertura, ainda sem chamado. */
+    @Column(name = "ticket_id", length = 36)
     private String ticketId;
+
+    /** A que ponto do histórico a evidência pertence: o chamado, um comentário ou um evento (etapa). */
+    @Builder.Default
+    @Column(name = "subject_type", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    private Subject subjectType = Subject.TICKET;
+
+    @Column(name = "subject_id", length = 36)
+    private String subjectId;
+
+    /** Interna: só a equipe vê. O solicitante só enxerga evidência pública. */
+    @Builder.Default
+    @Column(name = "internal", nullable = false)
+    private boolean internal = false;
 
     @Column(name = "tenant_id", nullable = false, length = 36)
     private String tenantId;
@@ -84,6 +99,12 @@ public class Attachment implements TenantAware {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    public enum Subject {
+        TICKET,
+        COMMENT,
+        EVENT
     }
 
     public enum VirusScanStatus {

@@ -24,9 +24,16 @@ public class TicketDto {
     private String assigneeId;
     private String reporterId;
     private String groupId;
+    private String queueId;
+    private String locationId;
+    private String topicId;
+    private String formVersionId;
+    private int cycleNo;
+    private int reopenCount;
     private String slaDefinitionId;
     private Instant responseDueAt;
     private Instant resolutionDueAt;
+    private Instant slaPausedAt;
     private Instant firstResponseAt;
     private Instant resolvedAt;
     private Instant closedAt;

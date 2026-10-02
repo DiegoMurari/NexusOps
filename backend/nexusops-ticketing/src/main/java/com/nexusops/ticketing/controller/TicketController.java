@@ -2,7 +2,10 @@ package com.nexusops.ticketing.controller;
 
 import com.nexusops.ticketing.domain.Ticket;
 import com.nexusops.ticketing.dto.*;
+import com.nexusops.ticketing.service.ConsoleService;
+import com.nexusops.ticketing.service.TicketCycleService;
 import com.nexusops.ticketing.service.TicketService;
+import com.nexusops.ticketing.service.TicketTimelineService;
 import com.nexusops.shared.security.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +27,9 @@ import java.util.List;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketTimelineService timelineService;
+    private final TicketCycleService cycleService;
+    private final ConsoleService consoleService;
     private final SecurityUtils securityUtils;
 
     @PostMapping
@@ -35,7 +41,7 @@ public class TicketController {
     }
 
     @GetMapping
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "List tickets with pagination")
     public ResponseEntity<Page<TicketDto>> listTickets(
             @RequestParam(required = false) Ticket.TicketStatus status,
@@ -60,8 +66,37 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.findByTenantId(tenantId, pageable));
     }
 
+    @GetMapping("/queue-view")
+    @PreAuthorize(StaffAccess.READ)
+    @Operation(summary = "The analyst's list: scope MINE, MY_QUEUES, UNASSIGNED or ALL, optional queue, status and text")
+    public ResponseEntity<Page<TicketDto>> queueView(
+            @RequestParam(defaultValue = "ALL") String scope,
+            @RequestParam(required = false) String queueId,
+            @RequestParam(required = false) Ticket.TicketStatus status,
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(consoleService.queueView(
+            securityUtils.getCurrentTenantId().orElseThrow(), securityUtils.getCurrentUserId().orElseThrow(),
+            ConsoleService.parseScope(scope), queueId, status, q, pageable));
+    }
+
+    @GetMapping("/counts")
+    @PreAuthorize(StaffAccess.READ)
+    @Operation(summary = "Open tickets per scope: mine, my queues, unassigned, all")
+    public ResponseEntity<ConsoleDto.Counts> counts() {
+        return ResponseEntity.ok(consoleService.counts(
+            securityUtils.getCurrentTenantId().orElseThrow(), securityUtils.getCurrentUserId().orElseThrow()));
+    }
+
+    @GetMapping("/{id}/context")
+    @PreAuthorize(StaffAccess.READ)
+    @Operation(summary = "Queue, topic, area, people and form answers of a ticket, names already resolved")
+    public ResponseEntity<ConsoleDto.Context> context(@PathVariable String id) {
+        return ResponseEntity.ok(consoleService.context(id, securityUtils.getCurrentTenantId().orElseThrow()));
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "Get ticket by ID")
     public ResponseEntity<TicketDto> getTicket(@PathVariable String id) {
         return ticketService.findById(id)
@@ -70,7 +105,7 @@ public class TicketController {
     }
 
     @GetMapping("/number/{ticketNumber}")
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "Get ticket by number")
     public ResponseEntity<TicketDto> getTicketByNumber(@PathVariable String ticketNumber) {
         return ticketService.findByTicketNumber(ticketNumber)
@@ -88,6 +123,22 @@ public class TicketController {
         return ResponseEntity.ok(ticketService.updateTicket(id, request, updatedBy));
     }
 
+    @GetMapping("/{id}/timeline")
+    @PreAuthorize(StaffAccess.READ)
+    @Operation(summary = "Append-only timeline of a ticket; internal events (routing, queues, SLA) only for staff")
+    public ResponseEntity<List<TicketEventDto>> getTimeline(@PathVariable String id) {
+        // O solicitante não vê a estrutura interna de filas, roteamento e SLA (ADR-013).
+        boolean staff = SecurityUtils.hasAnyRole("SUPER_ADMIN", "ADMIN", "MANAGER", "TEAM_LEAD", "AGENT");
+        return ResponseEntity.ok(timelineService.timeline(id, staff));
+    }
+
+    @GetMapping("/{id}/cycles")
+    @PreAuthorize(StaffAccess.READ)
+    @Operation(summary = "Service cycles of a ticket with the solution and outcome of each cycle")
+    public ResponseEntity<TicketCyclesDto> getCycles(@PathVariable String id) {
+        return ResponseEntity.ok(cycleService.cycles(id));
+    }
+
     @PostMapping("/{id}/transition")
     @PreAuthorize("hasPermission('TICKET', 'UPDATE')")
     @Operation(summary = "Transition ticket status")
@@ -96,6 +147,17 @@ public class TicketController {
             @Valid @RequestBody TransitionRequest request) {
         String changedBy = securityUtils.getCurrentUserId().orElseThrow();
         return ResponseEntity.ok(ticketService.transitionTicket(id, request, changedBy));
+    }
+
+    @PostMapping("/{id}/queue")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','MANAGER','TEAM_LEAD','AGENT')")
+    @Operation(summary = "Move ticket to another queue (assignee unchanged)")
+    public ResponseEntity<TicketDto> changeQueue(
+            @PathVariable String id,
+            @Valid @RequestBody com.nexusops.ticketing.dto.ChangeQueueRequest request) {
+        String changedBy = securityUtils.getCurrentUserId().orElseThrow();
+        String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
+        return ResponseEntity.ok(ticketService.changeQueue(id, request, changedBy, tenantId));
     }
 
     @PostMapping("/{id}/assign")
@@ -117,7 +179,7 @@ public class TicketController {
     }
 
     @GetMapping("/my-tickets")
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "Get tickets assigned to current user")
     public ResponseEntity<List<TicketDto>> getMyTickets() {
         String tenantId = securityUtils.getCurrentTenantId().orElseThrow();
@@ -126,7 +188,7 @@ public class TicketController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "Get ticket statistics")
     public ResponseEntity<TicketStatsDto> getStats() {
         String tenantId = securityUtils.getCurrentTenantId().orElseThrow();

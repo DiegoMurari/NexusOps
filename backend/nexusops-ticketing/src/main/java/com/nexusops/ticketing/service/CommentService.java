@@ -1,6 +1,10 @@
 package com.nexusops.ticketing.service;
 
+import com.nexusops.shared.exception.ValidationException;
 import com.nexusops.ticketing.domain.Comment;
+import com.nexusops.ticketing.domain.Ticket;
+import com.nexusops.ticketing.domain.TicketEvent;
+import com.nexusops.ticketing.domain.TicketEventType;
 import com.nexusops.ticketing.dto.CommentDto;
 import com.nexusops.ticketing.dto.CreateCommentRequest;
 import com.nexusops.ticketing.event.CommentAddedEvent;
@@ -16,7 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,9 +33,10 @@ public class CommentService {
     private final TicketRepository ticketRepository;
     private final CommentMapper commentMapper;
     private final TransactionalEventPublisher eventPublisher;
+    private final TicketTimelineService timelineService;
 
     public CommentDto addComment(String ticketId, CreateCommentRequest request, String authorId) {
-        ticketRepository.findById(ticketId)
+        Ticket ticket = ticketRepository.findById(ticketId)
             .orElseThrow(() -> new ResourceNotFoundException("Ticket", ticketId));
 
         Comment comment = commentMapper.toEntity(request);
@@ -40,6 +47,15 @@ public class CommentService {
         comment.setUpdatedAt(Instant.now());
 
         Comment saved = commentRepository.save(comment);
+
+        // O comentário é copiado para a timeline imutável: o histórico não depende da tabela de comentários.
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("commentId", saved.getId());
+        payload.put("public", request.isPublicComment());
+        payload.put("content", saved.getContent());
+        timelineService.append(ticket,
+            request.isPublicComment() ? TicketEventType.COMMENT_ADDED : TicketEventType.INTERNAL_NOTE_ADDED,
+            authorId, TicketEvent.ActorKind.USER, payload);
 
         eventPublisher.publishAfterCommit(new CommentAddedEvent(
             saved.getId(), saved.getVersion(),
@@ -62,7 +78,11 @@ public class CommentService {
         return commentRepository.findByTicketId(ticketId, pageable).map(commentMapper::toDto);
     }
 
+    /** Comentários fazem parte do histórico do chamado e não são removidos. */
     public void deleteComment(String id) {
-        commentRepository.deleteById(id);
+        if (!commentRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Comment", id);
+        }
+        throw new ValidationException("Comments are part of the ticket history and cannot be deleted");
     }
 }

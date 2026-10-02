@@ -37,7 +37,7 @@ public class CommentController {
     }
 
     @GetMapping
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "List comments for ticket")
     public ResponseEntity<Page<CommentDto>> listComments(
             @PathVariable String ticketId,
@@ -46,7 +46,7 @@ public class CommentController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasPermission('TICKET', 'READ')")
+    @PreAuthorize(StaffAccess.READ)
     @Operation(summary = "List all comments for ticket (no pagination)")
     public ResponseEntity<List<CommentDto>> listAllComments(@PathVariable String ticketId) {
         return ResponseEntity.ok(commentService.getCommentsByTicketId(ticketId));

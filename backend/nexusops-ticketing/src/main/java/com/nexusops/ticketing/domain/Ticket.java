@@ -76,6 +76,34 @@ public abstract class Ticket implements TenantAware {
     @Column(name = "group_id", length = 36)
     private String groupId;
 
+    /** Fila operacional responsável (equipe). Distinta do responsável individual (assigneeId). */
+    @Column(name = "queue_id", length = 36)
+    private String queueId;
+
+    @Column(name = "location_id", length = 36)
+    private String locationId;
+
+    @Column(name = "topic_id", length = 36)
+    private String topicId;
+
+    /** Versão exata do formulário do tópico com que o chamado foi aberto (nunca muda). */
+    @Column(name = "form_version_id", length = 36)
+    private String formVersionId;
+
+    /** Respostas do formulário, já validadas pelo servidor contra a versão acima. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "form_answers", columnDefinition = "jsonb")
+    private String formAnswers;
+
+    /** Ciclo de atendimento corrente: começa em 1 e avança a cada reabertura. */
+    @Builder.Default
+    @Column(name = "cycle_no", nullable = false)
+    private int cycleNo = 1;
+
+    @Builder.Default
+    @Column(name = "reopen_count", nullable = false)
+    private int reopenCount = 0;
+
     @Column(name = "sla_definition_id", length = 36)
     private String slaDefinitionId;
 
@@ -84,6 +112,10 @@ public abstract class Ticket implements TenantAware {
 
     @Column(name = "resolution_due_at")
     private Instant resolutionDueAt;
+
+    /** Início da pausa corrente do relógio de SLA (espera ou aguardando o solicitante); nulo = correndo. */
+    @Column(name = "sla_paused_at")
+    private Instant slaPausedAt;
 
     @Column(name = "first_response_at")
     private Instant firstResponseAt;

@@ -38,6 +38,20 @@ public class CreateTicketRequest {
 
     private String groupId;
 
+    /** Tópico do catálogo: quando informado, o sistema deriva fila, prioridade inicial e SLA dele. */
+    private String topicId;
+
+    /** Fila escolhida pelo atendente (ignorada quando o tópico define a fila). */
+    private String queueId;
+
+    private String locationId;
+
+    /** Respostas do formulário do tópico; o servidor valida contra a versão publicada. */
+    private java.util.Map<String, Object> formAnswers;
+
+    /** IDs de evidências já enviadas (preparadas) para este chamado; a política do formulário diz se são exigidas. */
+    private java.util.List<String> evidenceIds;
+
     private String ciReference;
 
     private String tags;

@@ -12,4 +12,11 @@ public interface AttachmentRepository extends JpaRepository<Attachment, String> 
     List<Attachment> findByTicketId(String ticketId);
 
     List<Attachment> findByUploaderId(String uploaderId);
+
+    List<Attachment> findByTicketIdOrderByCreatedAtAsc(String ticketId);
+
+    java.util.Optional<Attachment> findByIdAndTenantId(String id, String tenantId);
+
+    /** Anexos preparados (sem chamado) criados antes do limite: ninguém os confirmou. */
+    List<Attachment> findByTicketIdIsNullAndCreatedAtBefore(java.time.Instant before);
 }
