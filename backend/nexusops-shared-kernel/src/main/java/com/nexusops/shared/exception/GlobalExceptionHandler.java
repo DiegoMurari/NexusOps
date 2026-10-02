@@ -58,6 +58,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
     }
 
+    @ExceptionHandler(FieldValidationException.class)
+    public ResponseEntity<ProblemDetail> handleFieldValidation(FieldValidationException ex, HttpServletRequest request) {
+        log.warn("Field validation failed: {}", ex.getFieldErrors());
+        ProblemDetail problem = buildProblemDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getCode(), ex.getMessage(), request).getBody();
+        problem.setExtensions(new HashMap<>(ex.getFieldErrors()));
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errors = ex.getBindingResult().getFieldErrors().stream()
@@ -122,6 +130,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest request) {
         log.warn("Resource not found: {}", ex.getMessage());
         return buildProblemDetail(HttpStatus.NOT_FOUND, "ENDPOINT_NOT_FOUND", "Endpoint not found", request);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ProblemDetail> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        log.warn("Method not supported: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+            "Method '%s' is not supported for this endpoint".formatted(ex.getMethod()), request);
     }
 
     @ExceptionHandler(Exception.class)
